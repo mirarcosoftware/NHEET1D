@@ -480,7 +480,10 @@ plt.grid(True)
 
 #rootdir = r'C:\Users\pgareau\Source\repos\NHEET-1D-model\NHEET-1D-model\Figures'
 workingDir = os.getcwd()
-dirName = workingDir + r'\Solutions\Figures'
+if os.name == 'nt':
+    dirName = workingDir + r'\NHEET-1D-model\Solutions\Figures'
+else:
+    dirName = workingDir + r'/Solutions/Figures'
 # fileName = 'test.png'
 plt.savefig(dirName+'/'+fileName,bbox_inches = 'tight') #dpi=100
 

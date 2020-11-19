@@ -7,7 +7,10 @@ from termcolor import cprint
 import sys
 #from pathlib import Path
 workingDir = os.getcwd()
-filepath = workingDir + r'\coeffs'
+if os.name == 'nt':
+    filepath = workingDir + r'\NHEET-1D-model\coeffs'
+else:
+    filepath = workingDir + r'/coeffs'
 R_u = 8.31451
 
 # % species order (new)
