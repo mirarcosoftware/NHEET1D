@@ -481,7 +481,7 @@ plt.grid(True)
 #rootdir = r'C:\Users\pgareau\Source\repos\NHEET-1D-model\NHEET-1D-model\Figures'
 workingDir = os.getcwd()
 if os.name == 'nt':
-    dirName = workingDir + r'\NHEET-1D-model\Solutions\Figures'
+    dirName = workingDir + r'\Solutions\Figures'
 else:
     dirName = workingDir + r'/Solutions/Figures'
 # fileName = 'test.png'
