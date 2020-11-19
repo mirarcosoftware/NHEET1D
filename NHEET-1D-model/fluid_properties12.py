@@ -8,9 +8,9 @@ import sys
 #from pathlib import Path
 workingDir = os.getcwd()
 if os.name == 'nt':
-    filepath = workingDir + r'\NHEET-1D-model\coeffs'
+    filepath = workingDir + r'\NHEET-1D-model\coeffs\\'
 else:
-    filepath = workingDir + r'/coeffs'
+    filepath = workingDir + r'/coeffs/'
 R_u = 8.31451
 
 # % species order (new)
@@ -36,16 +36,16 @@ R_u = 8.31451
 # oxidant ='0=air' '1=oxy'
 
 ## Coefficients
-ahighh = loadtxt(filepath+r'\ahighh12.txt', comments="#", delimiter="\t", unpack=False)
-ahighhorg = loadtxt(filepath+r'\ahighhorg.txt', comments="#", delimiter="\t", unpack=False)
-ahighlamda = loadtxt(filepath+r'\ahighlamda12.txt', comments="#", delimiter="\t", unpack=False)
-ahighmu = loadtxt(filepath+r'\ahighmu12.txt', comments="#", delimiter="\t", unpack=False)
-alowh = loadtxt(filepath+r'\alowh12.txt', comments="#", delimiter="\t", unpack=False)
-alowhorg = loadtxt(filepath+r'\alowhorg.txt', comments="#", delimiter="\t", unpack=False)
-alowlamda = loadtxt(filepath+r'\alowlamda12.txt', comments="#", delimiter="\t", unpack=False)
-alowlamdaorg = loadtxt(filepath+r'\alowlamdaorg.txt', comments="#", delimiter="\t", unpack=False)
-alowmu = loadtxt(filepath+r'\alowmu12.txt', comments="#", delimiter="\t", unpack=False)
-alowmuorg = loadtxt(filepath+r'\alowmuorg.txt', comments="#", delimiter="\t", unpack=False)
+ahighh = loadtxt(filepath+r'ahighh12.txt', comments="#", delimiter="\t", unpack=False)
+ahighhorg = loadtxt(filepath+r'ahighhorg.txt', comments="#", delimiter="\t", unpack=False)
+ahighlamda = loadtxt(filepath+r'ahighlamda12.txt', comments="#", delimiter="\t", unpack=False)
+ahighmu = loadtxt(filepath+r'ahighmu12.txt', comments="#", delimiter="\t", unpack=False)
+alowh = loadtxt(filepath+r'alowh12.txt', comments="#", delimiter="\t", unpack=False)
+alowhorg = loadtxt(filepath+r'alowhorg.txt', comments="#", delimiter="\t", unpack=False)
+alowlamda = loadtxt(filepath+r'alowlamda12.txt', comments="#", delimiter="\t", unpack=False)
+alowlamdaorg = loadtxt(filepath+r'alowlamdaorg.txt', comments="#", delimiter="\t", unpack=False)
+alowmu = loadtxt(filepath+r'alowmu12.txt', comments="#", delimiter="\t", unpack=False)
+alowmuorg = loadtxt(filepath+r'alowmuorg.txt', comments="#", delimiter="\t", unpack=False)
 
 print('coefficients loaded')
 
