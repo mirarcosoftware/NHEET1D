@@ -22,7 +22,6 @@ from scipy.interpolate import griddata
 #import time
 from tictoc import tic, toc
 #import inspect
-import os
 #import csv
 
 R_u = 8.31451
