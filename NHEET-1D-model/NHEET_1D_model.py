@@ -105,17 +105,39 @@ def getB_Scs(C_Scf):
     
     return B_Scs
 
-
 def getdm_dt(rhof_in):
 
     dm_dt = rhof_in*area*V_in
     
     return dm_dt
 
-def Tprof(a,b,ps,lamda,t):
-    return a*np.sin(2.*np.pi/lamda*t+ps)+b
-#def Tprof(a,b,ps,lamda,weather_t):
-#    return weather_df[weather_inc,1] + 273.15
+def T_inlet(new_time):
+    if T_inlet_method == 1:
+        T = Tprof(new_time)
+        return T
+    elif T_inlet_method == 2: 
+        T = Ttable(new_time)
+        return T
+    else:
+        print('Error... Invalid Inlet Temperature Method Selection')
+
+def Tprof(new_time):
+    T_new = a*np.sin(2.*np.pi/lamda*new_time+ps)+b
+    return T_new
+
+def Ttable(new_time):
+
+    #input Table: time [hours], Temperature [C]
+    if new_time < 1E-8:
+        T = weather_df[0, 1] + 273.15 #[K]
+        return T
+    else:
+        time_hours = new_time/3600. 
+        table_row_index = int(np.floor(time_hours/table_intervals)) 
+        T_lin_intrpl = (weather_df[table_row_index + 1, 1] - weather_df[table_row_index, 1])/table_intervals*(time_hours - weather_df[table_row_index, 0]) \
+            + weather_df[table_row_index,1]
+
+        return T_lin_intrpl + 273.15
 
 def post_process():
     
@@ -181,7 +203,7 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
     ## plotting
     print('Plotting...')
     
-    plot_title=fileName+'\nVs = %.3f m/s, Q = %.1f cfm \nCycle = %.2f hours, Total time = %.1f hours' % (V_in, Qcfm_in,lamda/3600.0,time_hours[-1])
+    plot_title=fileName+'\nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f hours' % (V_in, Qcfm_in,time_hours[-1])
     # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
     xlabel= 'time, hr' 
     ylabel1= 'T, C'
@@ -225,13 +247,21 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
 #Ambient Pressure
 pamb = 101325.
 
-#Inlet Temperature profile parameters
-#Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
+#Initial Rock Temperature
 T0 = 275.65 #[K]
+
+#Inlet Temperature
+#Choose A Method: 1 = Defined Profile, 2 = Input CSV Table
+T_inlet_method = 2
+#Method 1 (Profile)
+#Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
 a = 42.5 #[K]
 b = 275.65 #[K]
-lamda = 3600.0*4. #[s]
+lamda = 3600.0*0.5 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
+#Method 2 (Input CSV Table)
+#Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
+weather_df = np.genfromtxt('Test_TempData.csv', delimiter=",", dtype = float, skip_header = 1)
 
 #Geometry 
 #Rock Mass
@@ -241,7 +271,7 @@ area = D**2 #np.pi/4.0*D**2 #m^2
 #Particle Diameter
 Dp = 0.028 #m
 #Insulation Thickness # Not using for now
-# ithk = 0.1 #m
+#ithk = 0.1 #m
 #Porosity
 eps = 0.4537
 
@@ -252,8 +282,12 @@ Qcfm_in = 27.13 #cfm
 N = 400+1
 
 #Transient Solution Parameters
-dt_Sc = 10. #time step size in seconds
-max_time = 16.0*3600. # set a max time constraint for time marching
+dt_Sc = 300. #time step size in seconds
+max_time = 1.0*3600. # set a max time constraint for time marching if T_inlet Profile (Method 0) is used
+if T_inlet_method == 1:
+    Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
+    table_intervals = weather_df[1,0] - weather_df[0,0]
+    max_time = Final_hour*3600.0
 
 #Output File Name
 fileName = 'Cleanup-Schumann-Validation_Abdel-Ghaffar-1980-PhD'
@@ -267,16 +301,6 @@ print('Setting Up and Initializing')
 MW,Rgas,p_frc,z_st,p_mol,ptot,rxC = reaction_balance()
 print('Fluid property relationships defined')
 
-weather_df = np.genfromtxt('WeatherData.csv', delimiter=",", dtype = float, skip_header = 1)
-#weather_df = pd.read_csv("WeatherData.csv", skiprows = 1)
-#print(weather_df)
-#temp = pd['Temp'].to_numpy().astype(float)
-#nans, x= np.isnan(temp), lambda z: z.nonzero()[0]
-#temp[nans]= np.interp(x(nans), x(~nans), temp[~nans])# checks for nan
-#arr_sum = np.sum(temp)
-#array_has_nan = np.isnan(arr_sum)
-#print(array_has_nan)
-
 #Flow rate calculations at Inlet
 Q_in = Qcfm_in/2118.88
 V_in = Q_in/area
@@ -284,7 +308,9 @@ V_in = Q_in/area
 #Fluid Properties 
 #At Inlet at t=0
 weather_inc = 0
-Tinf0 = Tprof(a,b,ps,lamda,0.0)
+#Tinf0 = Tprof(a,b,ps,lamda,0.0)
+#Tinf0 = weather_df[0, 1] + 273.15 #[K]
+Tinf0 = T_inlet(0.0)
 rhof_in = pamb/Rgas[1]/Tinf0 #kg/m^3
 cpf_in=specheat(Tinf0, p_frc[1], rxC)*1000./MW[1] #J/kg-K
 muf_in=viscosity(Tinf0, p_frc[1], rxC) #kg/m-s
@@ -362,13 +388,16 @@ Tinf_new = Tinf0
 
 tic() #Start timekeeping (tictoc) to determine how long computation takes
 current_time = t_Sc[-1]
+new_time = current_time + dt_Sc
 inc = 0
 
 while current_time < max_time:
              
     #At Inlet
     Tinf_old = Tinf_new
-    Tinf_new = Tprof(a,b,ps,lamda,dt_Sc*(inc+1))
+    #Tinf_new = Tprof(a,b,ps,lamda,dt_Sc*(inc+1))
+    Tinf_new = T_inlet(new_time)
+    
     #Update Fluid BC at Left End
     RHS_Sc[0,0]=Tinf_new
 
@@ -432,6 +461,7 @@ while current_time < max_time:
     T_Sc=np.vstack([T_Sc,delta_Sc.T]) #Stack transpose of delta array (now horizontal) to T(t) solution matrix
     t_Sc = np.append(t_Sc,dt_Sc*(inc+1)) #Append time values to the end of an array
     current_time = t_Sc[-1]
+    new_time = current_time + dt_Sc
     inc+=1
     
 
@@ -443,7 +473,6 @@ toc() #End timekeeping
 #####################################
 
 print('Post Processing')
-#Write solution files
 post_process()
 
 ####### END #######
