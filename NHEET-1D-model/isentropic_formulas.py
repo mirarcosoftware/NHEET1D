@@ -82,7 +82,7 @@ def mach_ttts(tt,ts,gam,inc):
 
 
 
-print('isentropic relationships defined')
+print('Isentropic fluid property relationships defined')
 
 
 # In[ ]:

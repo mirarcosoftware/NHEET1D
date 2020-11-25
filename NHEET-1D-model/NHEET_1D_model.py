@@ -16,7 +16,7 @@ import csv
 import pandas as pd
 from termcolor import cprint
 #from scipy.interpolate import griddata
-print('libraries loaded')
+print('Libraries loaded')
 #import time
 from tictoc import tic, toc
 
@@ -139,6 +139,18 @@ def Ttable(new_time):
 
         return T_lin_intrpl + 273.15
 
+def runtime_Update(current_time, max_time, num_runtime_updates):
+    if current_time > 0.25*max_time and num_runtime_updates == 0:
+        print('Solution Progress: 25%')
+        num_runtime_updates += 1
+    if current_time > 0.5*max_time and num_runtime_updates <= 1:
+        print('Solution Progress: 50%')
+        num_runtime_updates += 1
+    if current_time > 0.75*max_time and num_runtime_updates <= 2:
+        print('Solution Progress: 75%')
+        num_runtime_updates += 1
+    return num_runtime_updates
+
 def post_process():
     
     time_hours = t_Sc/3600.
@@ -244,26 +256,29 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
 #####     INPUTS     #####
 ##########################
 
-#Ambient Pressure
+### Ambient Pressure ###
 pamb = 101325.
 
-#Initial Rock Temperature
+### Initial Rock Temperature ###
 T0 = 275.65 #[K]
 
-#Inlet Temperature
+### Inlet Temperature ###
 #Choose A Method: 1 = Defined Profile, 2 = Input CSV Table
 T_inlet_method = 2
-#Method 1 (Profile)
+### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
 a = 42.5 #[K]
 b = 275.65 #[K]
 lamda = 3600.0*0.5 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
-#Method 2 (Input CSV Table)
+### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
-weather_df = np.genfromtxt('Test_TempData.csv', delimiter=",", dtype = float, skip_header = 1)
+weather_df = np.genfromtxt('Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
-#Geometry 
+### Volumetric Flow Rate (constant) ###
+Qcfm_in = 5.0 #cfm
+
+### Geometry ###
 #Rock Mass
 D=0.3048 #m
 L= 1.2192 #1.0*D #m
@@ -275,31 +290,29 @@ Dp = 0.028 #m
 #Porosity
 eps = 0.4537
 
-#Volumetric Flow Rate (constant)
-Qcfm_in = 27.13 #cfm
+### Spatial Discretization: N = # of points ###
+N = 200+1
 
-#Spatial Discretization: N = # of points
-N = 400+1
-
-#Transient Solution Parameters
-dt_Sc = 300. #time step size in seconds
+### Transient Solution Parameters ###
+#Temporal Discretization 
+dt_Sc = 3600.*4 #time step size in seconds
+#Maximum time
 max_time = 1.0*3600. # set a max time constraint for time marching if T_inlet Profile (Method 0) is used
-if T_inlet_method == 1:
+if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0]
-    max_time = Final_hour*3600.0
+    max_time = Final_hour*3600.0 / 10.
 
-#Output File Name
+### Output File Name ###
 fileName = 'Cleanup-Schumann-Validation_Abdel-Ghaffar-1980-PhD'
 
 ##############################################
 #####     Setup and Initialization     #######
 ##############################################
 
-print('Setting Up and Initializing')
+print('Setting Up and Initializing . . .')
 
 MW,Rgas,p_frc,z_st,p_mol,ptot,rxC = reaction_balance()
-print('Fluid property relationships defined')
 
 #Flow rate calculations at Inlet
 Q_in = Qcfm_in/2118.88
@@ -376,13 +389,13 @@ B_Scs = np.array([0.0]*N) #Ts, Tf
 #Fluid BC at LE - Temperature is fixed to inlet fluid temperature - Solid temperature is not fixed
 AA_Sc[0,0]=1.
 
-print('Setup and Initialization Complete')
+print('Setup and Initialization Complete\n')
 
 ######################################
 #####     Transient Solver     #######
 ######################################
 
-print('Solving')
+print('Solving . . .')
 Tinf_old = Tinf0
 Tinf_new = Tinf0
 
@@ -390,6 +403,7 @@ tic() #Start timekeeping (tictoc) to determine how long computation takes
 current_time = t_Sc[-1]
 new_time = current_time + dt_Sc
 inc = 0
+num_runtime_updates = 0
 
 while current_time < max_time:
              
@@ -463,16 +477,17 @@ while current_time < max_time:
     current_time = t_Sc[-1]
     new_time = current_time + dt_Sc
     inc+=1
+    num_runtime_updates = runtime_Update(current_time, max_time, num_runtime_updates)
     
 
-print('Solving Complete. Final solution time: %.2f hr' % (current_time/3600.))
+print('Solving Complete. \nFinal solution time: %.2f hr' % (current_time/3600.))
 toc() #End timekeeping 
 
 #####################################
 #####     Post-Processing     #######
 #####################################
 
-print('Post Processing')
+print('Post Processing . . .')
 post_process()
 
 ####### END #######

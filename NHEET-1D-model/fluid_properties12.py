@@ -47,7 +47,7 @@ alowlamdaorg = loadtxt(filepath+r'\alowlamdaorg.txt', comments="#", delimiter="\
 alowmu = loadtxt(filepath+r'\alowmu12.txt', comments="#", delimiter="\t", unpack=False)
 alowmuorg = loadtxt(filepath+r'\alowmuorg.txt', comments="#", delimiter="\t", unpack=False)
 
-print('coefficients loaded')
+print('Fluid property relationship coefficients loaded')
 
 def chem_rxn(ER,eta_comb,oxidant,rxC,rxH,rxO):
 # %(ER, eta_c, oxidant, rC, rH, rO);
@@ -540,6 +540,6 @@ def density_liq_kerosene(T,rho0): #T in K
 # la=conductivity(T, p_frc, rxC)
 # print(la)
 
-print('fluid properties loaded from path', filepath)
+print('Fluid property relationships loaded')
 
 # In[ ]:
