@@ -139,6 +139,24 @@ def Ttable(new_time):
 
         return T_lin_intrpl + 273.15
 
+def NextTimeStep(G0, t_Sc, dx_Sc, T_Sc, dt_old):
+    
+    CFL = 3000.
+
+    T_max = np.amax(T_Sc[len(t_Sc)-1])
+    rhof_min = pamb/Rgas[1]/T_max #kg/m^3
+    Vsuperficial_max = G0/rhof_min
+    
+    dt_new = CFL*dx_Sc/Vsuperficial_max
+    if dt_new/dt_old > 1.2:
+        dt_new = 1.2*dt_old
+    #elif dt_new/dt_old < 0.8:
+    #    dt_new = 0.8*dt_old
+    #if dt_new < 60.:
+    #    dt_new = 60.
+    
+    return dt_new
+
 def runtime_Update(current_time, max_time, num_runtime_updates):
     if current_time > 0.25*max_time and num_runtime_updates == 0:
         print('Solution Progress: 25%')
@@ -153,7 +171,7 @@ def runtime_Update(current_time, max_time, num_runtime_updates):
 
 def post_process():
     
-    time_hours = t_Sc/3600.
+    time_hours = t_Sc/3600./24.
     #Cell Index at X-locations of 0*L, 0.25*L, 0.5*L, 0.75*L, and 1*L 
     #Fluid
     cell_f0 = 0
@@ -207,6 +225,20 @@ def writeCSV(T_Post, time_hours):
                                        'Tf_0.75*L': '%.2f' %T_Post[i,3], 'Tf_1*L': '%.2f' %T_Post[i,4], 'Ts_0*L': '%.2f' %T_Post[i,5], 
                                        'Ts_0.25*L': '%.2f' %T_Post[i,6], 'Ts_0.50*L': '%.2f' %T_Post[i,7], 'Ts_0.75*L': '%.2f' %T_Post[i,8], 
                                        'Ts_1*L': '%.2f' %T_Post[i,9]})
+               
+    #For Full Data Set, Uncomment
+    #Full_Data_Set = np.array([[0.]*(len(T_Sc[0]) + 1)]*len(t_Sc))
+    #Full_Data_Set[:,0] = t_Sc[:] 
+    #for i in range(0, len(t_Sc)):
+    #    for j in range(0, len(T_Sc[0])):
+    #        Full_Data_Set[i,j+1] = T_Sc[i,j]
+
+    #fullDataSet = open(fileName+'_FullDataSet.csv', mode='w', newline='')
+
+    #with fullDataSet:
+
+    #    writer = csv.writer(fullDataSet)
+    #    writer.writerows(Full_Data_Set)
 
     print('CSV Files Complete')
     return
@@ -215,9 +247,9 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
     ## plotting
     print('Plotting...')
     
-    plot_title=fileName+'\nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f hours' % (V_in, Qcfm_in,time_hours[-1])
+    plot_title=fileName+'\nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f days, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
     # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
-    xlabel= 'time, hr' 
+    xlabel= 'time, days' 
     ylabel1= 'T, C'
 
     fig, ax1 = plt.subplots()
@@ -256,55 +288,63 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
 #####     INPUTS     #####
 ##########################
 
+### Output File Name ###
+fileName = 'CFL-Test-Hourly_Weather_Data_2010-2019'
+
 ### Ambient Pressure ###
 pamb = 101325.
 
 ### Initial Rock Temperature ###
-T0 = 275.65 #[K]
+T0 = 269.45 #[K]
 
 ### Inlet Temperature ###
 #Choose A Method: 1 = Defined Profile, 2 = Input CSV Table
 T_inlet_method = 2
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
-a = 42.5 #[K]
-b = 275.65 #[K]
-lamda = 3600.0*0.5 #[s]
+a = 44.25 #[K]
+b = 274.9 #[K]
+lamda = 3600.0*4.0 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
 ### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
 weather_df = np.genfromtxt('Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 5.0 #cfm
+Qcfm_in = 100. #cfm Qcfm_in = 2850 #cfm
 
 ### Geometry ###
 #Rock Mass
-D=0.3048 #m
-L= 1.2192 #1.0*D #m
+D=5. #m
+L= 1. #m
 area = D**2 #np.pi/4.0*D**2 #m^2
 #Particle Diameter
-Dp = 0.028 #m
+Dp = 0.005
+
+
+Vsuperficial = Qcfm_in/2118.88/area
+Re_mean = 1.125*Vsuperficial*Dp/1.81E-5 #m/s
+print('Vsuperficial, Re_mean')
+print(Vsuperficial, Re_mean)
+
 #Insulation Thickness # Not using for now
 #ithk = 0.1 #m
 #Porosity
-eps = 0.4537
+eps = 0.25
 
 ### Spatial Discretization: N = # of points ###
-N = 200+1
+N = 100+1
 
 ### Transient Solution Parameters ###
 #Temporal Discretization 
-dt_Sc = 3600.*4 #time step size in seconds
-#Maximum time
-max_time = 1.0*3600. # set a max time constraint for time marching if T_inlet Profile (Method 0) is used
+first_time_step_size = 3600.*0.25
+### Maximum Time - Method 1 (Profile) ###
+max_time = 3600.*1. 
+### Maximum Time - Method 2 (Input CSV Table) ###
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0]
-    max_time = Final_hour*3600.0 / 10.
-
-### Output File Name ###
-fileName = 'Cleanup-Schumann-Validation_Abdel-Ghaffar-1980-PhD'
+    max_time = Final_hour*3600.0 / 40.*1 #seconds
 
 ##############################################
 #####     Setup and Initialization     #######
@@ -401,15 +441,15 @@ Tinf_new = Tinf0
 
 tic() #Start timekeeping (tictoc) to determine how long computation takes
 current_time = t_Sc[-1]
-new_time = current_time + dt_Sc
+new_time = current_time + first_time_step_size
+dt_Sc = first_time_step_size
 inc = 0
 num_runtime_updates = 0
 
 while current_time < max_time:
-             
+
     #At Inlet
     Tinf_old = Tinf_new
-    #Tinf_new = Tprof(a,b,ps,lamda,dt_Sc*(inc+1))
     Tinf_new = T_inlet(new_time)
     
     #Update Fluid BC at Left End
@@ -473,12 +513,15 @@ while current_time < max_time:
     delta_Sc=np.linalg.lstsq(AA_Sc,RHS_Sc,rcond=-1)[0] #Returns the least-squares solution to a linear matrix equation
 
     T_Sc=np.vstack([T_Sc,delta_Sc.T]) #Stack transpose of delta array (now horizontal) to T(t) solution matrix
-    t_Sc = np.append(t_Sc,dt_Sc*(inc+1)) #Append time values to the end of an array
+    t_Sc = np.append(t_Sc, new_time) #Append time values to the end of an array
+
+    #NextTimeStep(G0, t_Sc, dx_Sc, T_Sc, dt_old):
+    dt_Sc = NextTimeStep(G_0, t_Sc, dx_Sc, T_Sc, dt_Sc)
+    #print(dt_Sc)
     current_time = t_Sc[-1]
     new_time = current_time + dt_Sc
     inc+=1
     num_runtime_updates = runtime_Update(current_time, max_time, num_runtime_updates)
-    
 
 print('Solving Complete. \nFinal solution time: %.2f hr' % (current_time/3600.))
 toc() #End timekeeping 
