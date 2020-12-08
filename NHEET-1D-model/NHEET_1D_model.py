@@ -62,9 +62,9 @@ def getA_Scf(rhof,cpf):
     
     return A_Scf
 
-def getB_Scf(cpf):
+def getB_Scf(G,cpf):
 
-    B_Scf = G_0*cpf
+    B_Scf = G*cpf
     
     return B_Scf
 
@@ -139,13 +139,163 @@ def Ttable(new_time):
 
         return T_lin_intrpl + 273.15
 
-def NextTimeStep(G0, t_Sc, dx_Sc, T_Sc, dt_old):
+def Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
+
+    #Note: Twice the size for each matrix and array due to coupling of Ts and Tf (Fluid and Solid combined)
+    AA_Sc = np.array([[0.]*2*N]*2*N)
+    RHS_Sc =np.array([[0.]*1]*2*N)
+
+    #Fluid BC at LE - Temperature is fixed to inlet fluid temperature - Solid temperature is not fixed
+    AA_Sc[0,0]=1.
+
+    #Matrix Inputs
+    #Fluid
+    # D_Scf = np.array([0.0]*N) #Ts, Tf
+    ##Solid
+    A_Scs = getA_Scs(rhos,cps)#dTs/dt #Constant 
+
+    #Update Fluid BC at Left End
+    RHS_Sc[0,0]=Tinf_new
+
+    rhof_Sc = pamb/Rgas[1]/Tinf_old #kg/m^3
+    cpf_Sc = specheat(Tinf_old, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+    muf_Sc = viscosity(Tinf_old, p_frc[1], rxC) #kg/m-s
+    kf_Sc = conductivity(Tinf_old, p_frc[1], rxC) #W/m-K    #Unused
+    dm_dt = getdm_dt(rhof_Sc)
+    G = dm_dt/area
     
-    CFL = 3000.
+    C_Scf = getC_Scf(rhof_Sc,muf_Sc)
+    B_Scs = getB_Scs(C_Scf)
+    
+    #Solid at LE - Fluid Properties are Constant
+    AA_Sc[N,N] = A_Scs/dt_Sc + B_Scs
+    AA_Sc[N,0] = -B_Scs
+    RHS_Sc[N] = delta_Sc[N]*(A_Scs/dt_Sc)
+
+    for j in range(1,N): #Begin for loop
+        
+        #Fluid Properties Note: A function of T only (i.e. incompressible ideal gas assumed)
+        T_cell_Scf=T_Sc[inc][j] 
+        rhof_Sc=p_Sc[j]/Rgas[1]/T_cell_Scf #kg/m^3
+        cpf_Sc=specheat(T_cell_Scf, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+        muf_Sc=viscosity(T_cell_Scf, p_frc[1], rxC) #kg/m-s
+        kf_Sc=conductivity(T_cell_Scf, p_frc[1], rxC) #W/m-K    #Unused
+        
+        #Get variables Avar_Scf,Bvar_Scf,Cvar_Scf
+        A_Scf = getA_Scf(rhof_Sc,cpf_Sc)
+        B_Scf = getB_Scf(G, cpf_Sc)
+        C_Scf = getC_Scf(rhof_Sc,muf_Sc)
+        B_Scs = getB_Scs(C_Scf)
+        
+        #Matrix Coefficients and RHS
+        if j < N-1: 
+            #Second Order Accurate Central Differencing Scheme
+            #Fluid  
+            AA_Sc[j,j-1] = -B_Scf/(2.*dx_Sc) 
+            AA_Sc[j,j] = A_Scf/dt_Sc + C_Scf
+            AA_Sc[j,j+1] = B_Scf/(2.*dx_Sc)
+            AA_Sc[j,j+N] = -C_Scf
+            RHS_Sc[j] = delta_Sc[j]*(A_Scf/dt_Sc)
+            #Solid
+            AA_Sc[j+N,j+N] = A_Scs/dt_Sc + B_Scs
+            AA_Sc[j+N,j] = -B_Scs
+            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs/dt_Sc)
+        else:
+            #First Order Accurate Backward Differencing Scheme for Cells at Right End
+            #Fluid 
+            AA_Sc[j,j-1] = -B_Scf/dx_Sc
+            AA_Sc[j,j] = A_Scf/dt_Sc + B_Scf/dx_Sc + C_Scf
+            AA_Sc[j,j+N] = -C_Scf
+            RHS_Sc[j] = delta_Sc[j]*(A_Scf/dt_Sc)
+            #Solid
+            AA_Sc[j+N,j+N] = A_Scs/dt_Sc + B_Scs
+            AA_Sc[j+N,j] = -B_Scs
+            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs/dt_Sc) #End for loop
+
+    return AA_Sc, RHS_Sc, G
+
+def Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
+    
+    #Note: Twice the size for each matrix and array due to coupling of Ts and Tf (Fluid and Solid combined)
+    AA_Sc = np.array([[0.]*2*N]*2*N)
+    RHS_Sc =np.array([[0.]*1]*2*N)
+
+    #Fluid BC at LE - Temperature is fixed to inlet fluid temperature - Solid temperature is not fixed
+    AA_Sc[0,0]=1.
+
+    #Matrix Inputs
+    #Fluid
+    # D_Scf = np.array([0.0]*N) #Ts, Tf
+    ##Solid
+    A_Scs = getA_Scs(rhos,cps)#dTs/dt #Constant 
+
+    #Update Fluid BC at Left End
+    RHS_Sc[0,0]=Tinf_new
+
+    rhof_Sc = pamb/Rgas[1]/Tinf_old #kg/m^3
+    cpf_Sc = specheat(Tinf_old, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+    muf_Sc = viscosity(Tinf_old, p_frc[1], rxC) #kg/m-s
+    kf_Sc = conductivity(Tinf_old, p_frc[1], rxC) #W/m-K    #Unused
+    dm_dt = getdm_dt(rhof_Sc)
+    G = dm_dt/area
+    
+    C_Scf = getC_Scf(rhof_Sc,muf_Sc)
+    B_Scs = getB_Scs(C_Scf)
+    
+    #Solid at LE - Fluid Properties are Constant
+    AA_Sc[N,N] = A_Scs/dt_Sc + B_Scs/2.0
+    AA_Sc[N,0] = -B_Scs/2.0
+    RHS_Sc[N] = delta_Sc[N]*(A_Scs/dt_Sc - B_Scs/2.0) + delta_Sc[0]*B_Scs/2.0
+
+    for j in range(1,N): #Begin for loop
+        
+        #Fluid Properties Note: A function of T only (i.e. incompressible ideal gas assumed)
+        T_cell_Scf = T_Sc[inc][j] 
+        rhof_Sc = p_Sc[j]/Rgas[1]/T_cell_Scf #kg/m^3
+        cpf_Sc = specheat(T_cell_Scf, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+        muf_Sc = viscosity(T_cell_Scf, p_frc[1], rxC) #kg/m-s
+        kf_Sc = conductivity(T_cell_Scf, p_frc[1], rxC) #W/m-K    #Unused
+        
+        #Get variables Avar_Scf,Bvar_Scf,Cvar_Scf
+        A_Scf = getA_Scf(rhof_Sc,cpf_Sc)
+        B_Scf = getB_Scf(G,cpf_Sc)
+        C_Scf =getC_Scf(rhof_Sc,muf_Sc)
+        B_Scs = getB_Scs(C_Scf)
+        
+        #Matrix Coefficients and RHS
+        if j < N-1: 
+            #Second Order Accurate Central Differencing Scheme
+            #Fluid  
+            AA_Sc[j,j-1] = -B_Scf/(4.0*dx_Sc) 
+            AA_Sc[j,j] = A_Scf/dt_Sc + C_Scf/2.0
+            AA_Sc[j,j+1] = B_Scf/(4.0*dx_Sc)
+            AA_Sc[j,j+N] = -C_Scf/2.0
+            RHS_Sc[j] = delta_Sc[j]*(A_Scf/dt_Sc - C_Scf/2.0) + (delta_Sc[j-1] - delta_Sc[j+1])*B_Scf/(4.0*dx_Sc) + delta_Sc[j+N]*C_Scf/2.0
+            #Solid
+            AA_Sc[j+N,j+N] = A_Scs/dt_Sc + B_Scs/2.0
+            AA_Sc[j+N,j] = -B_Scs/2.0
+            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs/dt_Sc - B_Scs/2.0) + delta_Sc[j]*B_Scs/2.0
+        else:
+            #First Order Accurate Backward Differencing Scheme for Cells at Right End
+            #Fluid 
+            AA_Sc[j,j-1] = -B_Scf/(2.0*dx_Sc)
+            AA_Sc[j,j] = A_Scf/dt_Sc + B_Scf/(2.0*dx_Sc) + C_Scf/2.0
+            AA_Sc[j,j+N] = -C_Scf/2.0
+            RHS_Sc[j] = delta_Sc[j]*(A_Scf/dt_Sc - B_Scf/(2.0*dx_Sc) - C_Scf/2.0) + delta_Sc[j-1]*B_Scf/(2.0*dx_Sc) + delta_Sc[j+N]*C_Scf/2.0
+            #Solid
+            AA_Sc[j+N,j+N] = A_Scs/dt_Sc + B_Scs/2.0
+            AA_Sc[j+N,j] = -B_Scs/2.0
+            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs/dt_Sc - B_Scs/2.0) + delta_Sc[j]*B_Scs/2.0
+
+    return AA_Sc, RHS_Sc, G
+
+def NextTimeStep(G, t_Sc, dx_Sc, T_Sc, dt_old):
+    
+    CFL = 220.
 
     T_max = np.amax(T_Sc[len(t_Sc)-1])
     rhof_min = pamb/Rgas[1]/T_max #kg/m^3
-    Vsuperficial_max = G0/rhof_min
+    Vsuperficial_max = G/rhof_min
     
     dt_new = CFL*dx_Sc/Vsuperficial_max
     if dt_new/dt_old > 1.2:
@@ -171,7 +321,7 @@ def runtime_Update(current_time, max_time, num_runtime_updates):
 
 def post_process():
     
-    time_hours = t_Sc/3600./24.
+    time_hours = t_Sc/3600.
     #Cell Index at X-locations of 0*L, 0.25*L, 0.5*L, 0.75*L, and 1*L 
     #Fluid
     cell_f0 = 0
@@ -249,7 +399,7 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
     
     plot_title=fileName+'\nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f days, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
     # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
-    xlabel= 'time, days' 
+    xlabel= 'time, hours' 
     ylabel1= 'T, C'
 
     fig, ax1 = plt.subplots()
@@ -289,7 +439,7 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
 ##########################
 
 ### Output File Name ###
-fileName = 'CFL-Test-Hourly_Weather_Data_2010-2019'
+fileName = 'Test-Backward-Euler-Validation-Abdel-Ghaffar'
 
 ### Ambient Pressure ###
 pamb = 101325.
@@ -298,8 +448,8 @@ pamb = 101325.
 T0 = 269.45 #[K]
 
 ### Inlet Temperature ###
-#Choose A Method: 1 = Defined Profile, 2 = Input CSV Table
-T_inlet_method = 2
+#Choose Between Two Methods: 1 = Defined Profile, 2 = Input CSV Table
+T_inlet_method = 1
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
 a = 44.25 #[K]
@@ -308,19 +458,26 @@ lamda = 3600.0*4.0 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
 ### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
-weather_df = np.genfromtxt('Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
+weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 100. #cfm Qcfm_in = 2850 #cfm
+Qcfm_in = 27.13 #cfm Qcfm_in = 2850 #cfm
 
-### Geometry ###
+#### Geometry ###
+##Rock Mass
+#D=5. #m
+#L= 1. #m
+#area = D**2 #np.pi/4.0*D**2 #m^2
+##Particle Diameter
+#Dp = 0.005
+#
+### Geometry ### Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
 #Rock Mass
-D=5. #m
-L= 1. #m
+D = 0.3048 #m
+L= 1.2192 #m
 area = D**2 #np.pi/4.0*D**2 #m^2
 #Particle Diameter
-Dp = 0.005
-
+Dp = 0.028
 
 Vsuperficial = Qcfm_in/2118.88/area
 Re_mean = 1.125*Vsuperficial*Dp/1.81E-5 #m/s
@@ -330,21 +487,27 @@ print(Vsuperficial, Re_mean)
 #Insulation Thickness # Not using for now
 #ithk = 0.1 #m
 #Porosity
-eps = 0.25
+eps = 0.4537 #0.25
 
 ### Spatial Discretization: N = # of points ###
-N = 100+1
+N = 200+1
 
 ### Transient Solution Parameters ###
 #Temporal Discretization 
-first_time_step_size = 3600.*0.25
+first_time_step_size = 10. #3600.*0.25
 ### Maximum Time - Method 1 (Profile) ###
-max_time = 3600.*1. 
+max_time = 3600.*16. 
 ### Maximum Time - Method 2 (Input CSV Table) ###
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0]
     max_time = Final_hour*3600.0 / 40.*1 #seconds
+
+### Time Integrator ###
+## Choose Between Two Methods: 
+    # 1 = Backward Euler - First Order
+    # 2 = Crank Nicholson (i.e. Trapezoidal Rule) - Second Order
+time_integrator = 1
 
 ##############################################
 #####     Setup and Initialization     #######
@@ -358,23 +521,16 @@ MW,Rgas,p_frc,z_st,p_mol,ptot,rxC = reaction_balance()
 Q_in = Qcfm_in/2118.88
 V_in = Q_in/area
 
-#Fluid Properties 
+#Fluid Properties Initialization
+p_Sc = np.array([pamb]*N) #Pressure gradient - Assumed constant everywhere for now
+Tinf0 = T_inlet(0.)
+
 #At Inlet at t=0
-weather_inc = 0
-#Tinf0 = Tprof(a,b,ps,lamda,0.0)
-#Tinf0 = weather_df[0, 1] + 273.15 #[K]
-Tinf0 = T_inlet(0.0)
-rhof_in = pamb/Rgas[1]/Tinf0 #kg/m^3
+rhof_in = p_Sc[0]/Rgas[1]/Tinf0 #kg/m^3
 cpf_in=specheat(Tinf0, p_frc[1], rxC)*1000./MW[1] #J/kg-K
 muf_in=viscosity(Tinf0, p_frc[1], rxC) #kg/m-s
 kf_in=conductivity(Tinf0, p_frc[1], rxC) #W/m-K
 G_0=rhof_in*V_in
-mdot_0 = rhof_in*area*V_in
-#Elsewhere at t=0
-rhof_0 = pamb/Rgas[1]/T0 #kg/m^3
-cpf_0=specheat(T0, p_frc[1], rxC)*1000./MW[1] #J/kg-K
-muf_0=viscosity(T0, p_frc[1], rxC) #kg/m-s
-kf_0=conductivity(T0, p_frc[1], rxC) #W/m-K
 
 #Solid Properties (Constant)
 rhos = 2418.79 #2635. #kg/m^3
@@ -383,20 +539,7 @@ ks = 1.2626 #2.6 #W/m-K
 
 #Particle Reynolds and Prandtl at Inlet
 Rep_in = G_0*Dp/muf_in
-Pr_in = muf_in*cpf_in/kf_in 
-
-#Schumanns Fluid property initialization at temperature T0 and left end fluid cell at Tinf
-rhof_Sc = np.array([rhof_0]*N) #kg/m^3
-cpf_Sc = np.array([cpf_0]*N) #J/kg-K
-muf_Sc = np.array([muf_0]*N) #kg/m-s
-kf_Sc = np.array([kf_0]*N) #W/m-K
-rhof_Sc[0] = rhof_in #kg/m^3
-cpf_Sc[0] = cpf_in #J/kg-K
-muf_Sc[0] = muf_in #kg/m-s
-kf_Sc[0] = kf_in #W/m-K
-
-#Pressure gradient initialization - Assumed constant everywhere for now
-p_Sc = np.array([pamb]*N)
+Pr_in = muf_in*cpf_in/kf_in
 
 #Initialize a time array 
 t_Sc=np.array([0.])
@@ -407,27 +550,10 @@ dx_Sc = x_Sc[1]-x_Sc[0] #space between points
 
 ########## Matrix and Array Initialization ##########
 
-#Note: Twice the size for each matrix and array due to coupling of Ts and Tf (Fluid and Solid combined)
-AA_Sc = np.array([[0.]*2*N]*2*N)
-RHS_Sc =np.array([[0.]*1]*2*N)
-
 T_Sc = np.array([[T0]*2*N]) #initialization of T0 everywhere
 T_Sc[0,0] = Tinf0 #Fluid BC at LE - Temperature is fixed to inlet fluid temperature - Solid temperature is not fixed
 delta_Sc = np.array([[T0]*1]*2*N) #delta is a temporary array of T at time t-1 - initialization
 delta_Sc[0,0] = Tinf0
-
-#Arrays
-#Fluid
-A_Scf = np.array([0.0]*N) #dTf/dt
-B_Scf = np.array([0.0]*N) #dTf/dx
-C_Scf = np.array([0.0]*N) #Ts, Tf
-# D_Scf = np.array([0.0]*N) #Ts, Tf
-##Solid
-A_Scs = np.array([getA_Scs(rhos,cps)]*N) #dTs/dt #Constant
-B_Scs = np.array([0.0]*N) #Ts, Tf 
-
-#Fluid BC at LE - Temperature is fixed to inlet fluid temperature - Solid temperature is not fixed
-AA_Sc[0,0]=1.
 
 print('Setup and Initialization Complete\n')
 
@@ -448,76 +574,26 @@ num_runtime_updates = 0
 
 while current_time < max_time:
 
-    #At Inlet
+    ##### At Inlet #####
     Tinf_old = Tinf_new
     Tinf_new = T_inlet(new_time)
     
-    #Update Fluid BC at Left End
-    RHS_Sc[0,0]=Tinf_new
+    ##### Get Matrix AA and Vector RHS #####
+    if time_integrator == 1:
+        AA_Sc,RHS_Sc, G = Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
+    elif time_integrator == 2:
+        AA_Sc,RHS_Sc, G = Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
+    else:
+        print("Incorrect Time Integrator Selection")
+        break
 
-    rhof_Sc[0] = pamb/Rgas[1]/Tinf_old #kg/m^3
-    cpf_Sc[0] = specheat(Tinf_old, p_frc[1], rxC)*1000./MW[1] #J/kg-K
-    muf_Sc[0] = viscosity(Tinf_old, p_frc[1], rxC) #kg/m-s
-    kf_Sc[0] = conductivity(Tinf_old, p_frc[1], rxC) #W/m-K    #Unused
-    dm_dt = getdm_dt(rhof_Sc[0])
-    G = dm_dt/area
-    
-    C_Scf[0]=getC_Scf(rhof_Sc[0],muf_Sc[0])
-    B_Scs[0]=getB_Scs(C_Scf[0])
-    
-    #Solid at LE - Fluid Properties are Constant
-    AA_Sc[N,N] = A_Scs[0]/dt_Sc + B_Scs[0]
-    AA_Sc[N,0] = -B_Scs[0]
-    RHS_Sc[N] = delta_Sc[N]*(A_Scs[0]/dt_Sc)
-
-    for j in range(1,N): #Begin for loop
-        
-        #Fluid Properties Note: A function of T only (i.e. incompressible ideal gas assumed)
-        T_cell_Scf=T_Sc[inc][j] 
-        rhof_Sc[j]=p_Sc[j]/Rgas[1]/T_cell_Scf #kg/m^3
-        cpf_Sc[j]=specheat(T_cell_Scf, p_frc[1], rxC)*1000./MW[1] #J/kg-K
-        muf_Sc[j]=viscosity(T_cell_Scf, p_frc[1], rxC) #kg/m-s
-        kf_Sc[j]=conductivity(T_cell_Scf, p_frc[1], rxC) #W/m-K    #Unused
-        
-        #Get variables Avar_Scf,Bvar_Scf,Cvar_Scf
-        A_Scf[j]=getA_Scf(rhof_Sc[j],cpf_Sc[j])
-        B_Scf[j]=getB_Scf(cpf_Sc[j])
-        C_Scf[j]=getC_Scf(rhof_Sc[j],muf_Sc[j])
-        B_Scs[j]=getB_Scs(C_Scf[j])
-        
-        #Matrix Coefficients and RHS
-        if j < N-1: 
-            #Second Order Accurate Central Differencing Scheme
-            #Fluid  
-            AA_Sc[j,j-1]=-B_Scf[j]/(2.*dx_Sc) 
-            AA_Sc[j,j]=A_Scf[j]/dt_Sc +C_Scf[j]
-            AA_Sc[j,j+1]=B_Scf[j]/(2.*dx_Sc)
-            AA_Sc[j,j+N] = -C_Scf[j]
-            RHS_Sc[j]=delta_Sc[j]*(A_Scf[j]/dt_Sc)
-            #Solid
-            AA_Sc[j+N,j+N]=A_Scs[j]/dt_Sc +B_Scs[j]
-            AA_Sc[j+N,j] = -B_Scs[j]
-            RHS_Sc[j+N]=delta_Sc[j+N]*(A_Scs[j]/dt_Sc)
-        else:
-            #First Order Accurate Backward Differencing Scheme for Cells at Right End
-            #Fluid 
-            AA_Sc[j,j-1] = -B_Scf[j]/dx_Sc
-            AA_Sc[j,j] = A_Scf[j]/dt_Sc +B_Scf[j]/dx_Sc +C_Scf[j]
-            AA_Sc[j,j+N] = -C_Scf[j]
-            RHS_Sc[j] = delta_Sc[j]*(A_Scf[j]/dt_Sc)
-            #Solid
-            AA_Sc[j+N,j+N] = A_Scs[j]/dt_Sc +B_Scs[j]
-            AA_Sc[j+N,j] = -B_Scs[j]
-            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs[j]/dt_Sc) #End for loop
-        
+    ##### Solve temperature at updated time "new_time" #####
     delta_Sc=np.linalg.lstsq(AA_Sc,RHS_Sc,rcond=-1)[0] #Returns the least-squares solution to a linear matrix equation
 
     T_Sc=np.vstack([T_Sc,delta_Sc.T]) #Stack transpose of delta array (now horizontal) to T(t) solution matrix
     t_Sc = np.append(t_Sc, new_time) #Append time values to the end of an array
 
-    #NextTimeStep(G0, t_Sc, dx_Sc, T_Sc, dt_old):
-    dt_Sc = NextTimeStep(G_0, t_Sc, dx_Sc, T_Sc, dt_Sc)
-    #print(dt_Sc)
+    dt_Sc = NextTimeStep(G, t_Sc, dx_Sc, T_Sc, dt_Sc)
     current_time = t_Sc[-1]
     new_time = current_time + dt_Sc
     inc+=1
