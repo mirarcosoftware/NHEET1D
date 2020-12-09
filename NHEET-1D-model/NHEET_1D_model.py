@@ -68,16 +68,16 @@ def getB_Scf(G,cpf):
     
     return B_Scf
 
-def getC_Scf(rhof,muf):
+def getC_Scf(G, Dp, muf, kf, eps):
     
     #Heat Transfer Correlations
-    #Rep = G*Dp/muf
-    #Nup=((1.18*Rep**0.58)**4 + (0.23*(1/(1-eps)*Rep)**0.75)**4)**0.25
+    Rep = G*Dp/muf
     #Verify which hp
-    #hp=1/(Dp/(Nup*kf_in) + Dp/(10*ks)) -> more correct kf_in value, but using original value from Ansys Fluent for now
-    #hp=1/(Dp/(Nup*rhof) + Dp/(10*rhos))
-    hp= 17.773 #10.89797907 #Assumed constant for now
-    Ap= 6*(1-eps)/(Dp)
+    Nup = ((1.18*Rep**0.58)**4 + (0.23*(Rep/(1 - eps))**0.75 )**4)**0.25
+    hp = Nup*kf/Dp
+    #hp = 17.773    #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
+    #hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) 
+    Ap = 6*(1-eps)/(Dp)
     C_Scf = hp*Ap 
 
     return C_Scf
@@ -164,7 +164,7 @@ def Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
     dm_dt = getdm_dt(rhof_Sc)
     G = dm_dt/area
     
-    C_Scf = getC_Scf(rhof_Sc,muf_Sc)
+    C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
     B_Scs = getB_Scs(C_Scf)
     
     #Solid at LE - Fluid Properties are Constant
@@ -184,7 +184,7 @@ def Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
         #Get variables Avar_Scf,Bvar_Scf,Cvar_Scf
         A_Scf = getA_Scf(rhof_Sc,cpf_Sc)
         B_Scf = getB_Scf(G, cpf_Sc)
-        C_Scf = getC_Scf(rhof_Sc,muf_Sc)
+        C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
         B_Scs = getB_Scs(C_Scf)
         
         #Matrix Coefficients and RHS
@@ -239,7 +239,7 @@ def Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
     dm_dt = getdm_dt(rhof_Sc)
     G = dm_dt/area
     
-    C_Scf = getC_Scf(rhof_Sc,muf_Sc)
+    C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
     B_Scs = getB_Scs(C_Scf)
     
     #Solid at LE - Fluid Properties are Constant
@@ -259,7 +259,7 @@ def Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
         #Get variables Avar_Scf,Bvar_Scf,Cvar_Scf
         A_Scf = getA_Scf(rhof_Sc,cpf_Sc)
         B_Scf = getB_Scf(G,cpf_Sc)
-        C_Scf =getC_Scf(rhof_Sc,muf_Sc)
+        C_Scf =getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
         B_Scs = getB_Scs(C_Scf)
         
         #Matrix Coefficients and RHS
@@ -439,7 +439,7 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
 ##########################
 
 ### Output File Name ###
-fileName = 'Test-Backward-Euler-Validation-Abdel-Ghaffar'
+fileName = 'Test-hp-Backward-Euler-Validation-Abdel-Ghaffar'
 
 ### Ambient Pressure ###
 pamb = 101325.
@@ -533,9 +533,14 @@ kf_in=conductivity(Tinf0, p_frc[1], rxC) #W/m-K
 G_0=rhof_in*V_in
 
 #Solid Properties (Constant)
-rhos = 2418.79 #2635. #kg/m^3
-cps = 908.54 #790. #J/kg-K
-ks = 1.2626 #2.6 #W/m-K
+### Granite
+#rhos = 2635. #kg/m^3
+#cps = 790. #J/kg-K
+#ks = 2.6 #W/m-K
+### Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
+rhos = 2418.79 #kg/m^3
+cps = 908.54 #J/kg-K
+ks = 1.2626 #W/m-K
 
 #Particle Reynolds and Prandtl at Inlet
 Rep_in = G_0*Dp/muf_in
