@@ -105,12 +105,6 @@ def getB_Scs(C_Scf):
     
     return B_Scs
 
-def getdm_dt(rhof_in):
-
-    dm_dt = rhof_in*area*V_in
-    
-    return dm_dt
-
 def T_inlet(new_time):
     if T_inlet_method == 1:
         T = Tprof(new_time)
@@ -139,6 +133,27 @@ def Ttable(new_time):
 
         return T_lin_intrpl + 273.15
 
+def ErgunEQ_PressureLoss():
+
+    if T_inlet_method == 1:
+        T_mean = b
+    elif T_inlet_method == 2:
+        T_max = np.amax(weather_df[:,1]) + 273.15 #K
+        T_min = np.amin(weather_df[:,1]) + 273.15 #K
+        T_mean = 0.5*(T_max + T_min)
+    else:
+        print('Cannot calculate pressure loss... Invalid inlet temperature specification')
+
+    rhof_mean = pamb/Rgas[1]/T_mean #kg/m^3
+    #cpf_mean = specheat(T_mean, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+    muf_mean = viscosity(T_mean, p_frc[1], rxC) #kg/m-s
+    #kf_mean = conductivity(T_mean, p_frc[1], rxC) #W/m-K    #Unused
+    G_mean = rhof_mean*V_in
+    
+    delta_p = L*(150.*muf_mean/Dp**2*(1-eps)**2/eps**3*V_in + 1.75*rhof_mean/Dp*(1-eps)/eps**3*V_in**2)
+    print(delta_p)
+    return delta_p
+
 def Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
 
     #Note: Twice the size for each matrix and array due to coupling of Ts and Tf (Fluid and Solid combined)
@@ -161,9 +176,8 @@ def Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
     cpf_Sc = specheat(Tinf_old, p_frc[1], rxC)*1000./MW[1] #J/kg-K
     muf_Sc = viscosity(Tinf_old, p_frc[1], rxC) #kg/m-s
     kf_Sc = conductivity(Tinf_old, p_frc[1], rxC) #W/m-K    #Unused
-    dm_dt = getdm_dt(rhof_Sc)
-    G = dm_dt/area
-    
+    G = rhof_Sc*V_in
+        
     C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
     B_Scs = getB_Scs(C_Scf)
     
@@ -236,8 +250,7 @@ def Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
     cpf_Sc = specheat(Tinf_old, p_frc[1], rxC)*1000./MW[1] #J/kg-K
     muf_Sc = viscosity(Tinf_old, p_frc[1], rxC) #kg/m-s
     kf_Sc = conductivity(Tinf_old, p_frc[1], rxC) #W/m-K    #Unused
-    dm_dt = getdm_dt(rhof_Sc)
-    G = dm_dt/area
+    G = rhof_Sc*V_in
     
     C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
     B_Scs = getB_Scs(C_Scf)
@@ -289,10 +302,8 @@ def Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
 
     return AA_Sc, RHS_Sc, G
 
-def NextTimeStep(G, t_Sc, dx_Sc, T_Sc, dt_old):
+def NextTimeStep(CFL, G, t_Sc, dx_Sc, T_Sc, dt_old):
     
-    CFL = 220.
-
     T_max = np.amax(T_Sc[len(t_Sc)-1])
     rhof_min = pamb/Rgas[1]/T_max #kg/m^3
     Vsuperficial_max = G/rhof_min
@@ -358,15 +369,35 @@ def post_process():
     plot_colors = ['r','b','g','y','c','r','b','g','y','c']
     #Available markers: 'o','d','s','*','<','>','^','v','1','2','3','4']
     #plot_markers = []
-
+    Case_Description_Output()
     writeCSV(T_Post, time_hours)
     plot(x_Post, T_Post, time_hours, plot_lines, plot_colors)
+
+def Case_Description_Output():
+    file = open(fileName+'_Description.txt', 'w')
+    file.write('Case Description for ' + fileName + ':\n')
+    if T_inlet_method == 1:
+        file.write('Inlet Temperature Specified by User-Defined Function \n')
+    elif T_inlet_method == 2:
+        file.write('Inlet Temperature Specified by CSV Table Input \n')
+    if time_integrator == 1:
+        file.write('Backward Euler 1st Order Time Integration \n')
+    elif time_integrator == 2:
+        file.write('Crank Nicholson (i.e. Trapezoidal Rule) 2nd Order Time Integration \n')
+    file.write('Column Diameter or Side Length: %.3f m \nColumn Height: %.3f m \nParticle Diameter: %.3f m \nVoid Fraction: %.3f \n' % (D, L, Dp, eps))
+    file.write('Flow rate: %.4f m^3/s or %.1f cfm \nSuperficial Velocity: %.3f m/s \nReynolds Number (Ave): %.1f \n' % (Q_in, Qcfm_in, V_in, Re_mean))
+    file.write('CFL Number: %.2f \nAverage Time Step Size: %.2f s \n' % (CFL, CFL*dx_Sc/V_in))
+    file.write('Maximum Solution Time: %.2f hr \n' % (max_time/3600.))
+    file.write('Ergun EQ Pressure Loss: %.1f Pa \n' % (delta_p))
+    file.close()
+  
+    return 
 
 def writeCSV(T_Post, time_hours):
     print('Writing CSV Files...')
 
     #dirName = r'C:\Users\pgareau\source\repos\NHEET-1D-model\NHEET-1D-model\Solutions\Data'
-    with open(fileName+'.csv', mode='w', newline='') as CSV_file:
+    with open(fileName+'_CSV.csv', mode='w', newline='') as CSV_file:
         fieldnames = ['time_hours', 'Tf_0*L', 'Tf_0.25*L', 'Tf_0.50*L', 'Tf_0.75*L', 'Tf_1*L', 'Ts_0*L', 'Ts_0.25*L', 'Ts_0.50*L', 'Ts_0.75*L', 'Ts_1*L']
         write_file = csv.DictWriter(CSV_file, fieldnames=fieldnames)
         write_file.writeheader()
@@ -439,55 +470,54 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
 ##########################
 
 ### Output File Name ###
-fileName = 'Test-hp-Backward-Euler-Validation-Abdel-Ghaffar'
+fileName = 'Lab-Design-Test'
 
 ### Ambient Pressure ###
-pamb = 101325.
+pamb = 101325. #[Pa]
 
 ### Initial Rock Temperature ###
-T0 = 269.45 #[K]
+T0 = 283.15 #[K]
 
 ### Inlet Temperature ###
-#Choose Between Two Methods: 1 = Defined Profile, 2 = Input CSV Table
+#Choose Between Two Methods: 1 = User-Defined Function, 2 = Input CSV Table
 T_inlet_method = 1
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
-a = 44.25 #[K]
-b = 274.9 #[K]
-lamda = 3600.0*4.0 #[s]
+a = 30. #[K]
+b = 283.15 #[K]
+lamda = 3600.0*0.5 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
 ### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
 weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 27.13 #cfm Qcfm_in = 2850 #cfm
+Qcfm_in = 16. #cfm Qcfm_in = 2850 #cfm
 
 #### Geometry ###
+#Rock Mass
+D = 0.4572 #m
+L = D*1.0 #m
+area = np.pi/4.0*D**2 #m^2
+#Particle Diameter
+Dp = 0.0075
+#
+### Geometry ### #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
 ##Rock Mass
-#D=5. #m
-#L= 1. #m
+#D = 0.3048 #m
+#L= 1.2192 #m
 #area = D**2 #np.pi/4.0*D**2 #m^2
 ##Particle Diameter
-#Dp = 0.005
-#
-### Geometry ### Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-#Rock Mass
-D = 0.3048 #m
-L= 1.2192 #m
-area = D**2 #np.pi/4.0*D**2 #m^2
-#Particle Diameter
-Dp = 0.028
+#Dp = 0.028
 
 Vsuperficial = Qcfm_in/2118.88/area
 Re_mean = 1.125*Vsuperficial*Dp/1.81E-5 #m/s
-print('Vsuperficial, Re_mean')
-print(Vsuperficial, Re_mean)
 
 #Insulation Thickness # Not using for now
 #ithk = 0.1 #m
 #Porosity
-eps = 0.4537 #0.25
+eps = 0.2
+#eps = 0.4537 #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
 
 ### Spatial Discretization: N = # of points ###
 N = 200+1
@@ -496,18 +526,20 @@ N = 200+1
 #Temporal Discretization 
 first_time_step_size = 10. #3600.*0.25
 ### Maximum Time - Method 1 (Profile) ###
-max_time = 3600.*16. 
+max_time = 3600.*2. 
 ### Maximum Time - Method 2 (Input CSV Table) ###
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
-    table_intervals = weather_df[1,0] - weather_df[0,0]
+    table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
     max_time = Final_hour*3600.0 / 40.*1 #seconds
+### Courant Friedrichs Lewy Number
+CFL = 250.
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
     # 1 = Backward Euler - First Order
     # 2 = Crank Nicholson (i.e. Trapezoidal Rule) - Second Order
-time_integrator = 1
+time_integrator = 2
 
 ##############################################
 #####     Setup and Initialization     #######
@@ -520,6 +552,8 @@ MW,Rgas,p_frc,z_st,p_mol,ptot,rxC = reaction_balance()
 #Flow rate calculations at Inlet
 Q_in = Qcfm_in/2118.88
 V_in = Q_in/area
+#Ergun EQ delta_p
+delta_p = ErgunEQ_PressureLoss()
 
 #Fluid Properties Initialization
 p_Sc = np.array([pamb]*N) #Pressure gradient - Assumed constant everywhere for now
@@ -534,13 +568,13 @@ G_0=rhof_in*V_in
 
 #Solid Properties (Constant)
 ### Granite
-#rhos = 2635. #kg/m^3
-#cps = 790. #J/kg-K
-#ks = 2.6 #W/m-K
+rhos = 2635. #kg/m^3
+cps = 790. #J/kg-K
+ks = 2.6 #W/m-K
 ### Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-rhos = 2418.79 #kg/m^3
-cps = 908.54 #J/kg-K
-ks = 1.2626 #W/m-K
+#rhos = 2418.79 #kg/m^3
+#cps = 908.54 #J/kg-K
+#ks = 1.2626 #W/m-K
 
 #Particle Reynolds and Prandtl at Inlet
 Rep_in = G_0*Dp/muf_in
@@ -562,18 +596,38 @@ delta_Sc[0,0] = Tinf0
 
 print('Setup and Initialization Complete\n')
 
+print('Setup Description:')
+print('Filename: ' +fileName) 
+if T_inlet_method == 1:
+    print('Inlet Temperature Specified by User-Defined Function')
+elif T_inlet_method == 2:
+    print('Inlet Temperature Specified by CSV Table Input')
+else:
+    print('Error - Invalid Inlet Temperature Method Selection')
+if time_integrator == 1:
+    print('Backward Euler 1st Order Time Integration')
+elif time_integrator == 2:
+    print('Crank Nicholson (i.e. Trapezoidal Rule) 2nd Order Time Integration')
+else:
+    print('Error - Invalid Time Integration Method Selection')
+print('Column Diameter or Side Length: %.3f m \nColumn Height: %.3f m \nParticle Diameter: %.3f m \nVoid Fraction: %.3f' % (D, L, Dp, eps))
+print('Flow rate: %.4f m^3/s or %.1f cfm \nSuperficial Velocity: %.3f m/s \nReynolds Number (Ave): %.1f' % (Q_in, Qcfm_in, V_in, Re_mean))
+print('CFL Number: %.2f \nAverage Time Step Size: %.2f s' % (CFL, CFL*dx_Sc/V_in))
+print('Maximum Solution Time: %.2f hr' % (max_time/3600.))
+print('Ergun EQ Pressure Loss: %.1f Pa or %.3f in. w.g.\n' % (delta_p, delta_p/248.84))
+
 ######################################
 #####     Transient Solver     #######
 ######################################
 
 print('Solving . . .')
-Tinf_old = Tinf0
-Tinf_new = Tinf0
 
 tic() #Start timekeeping (tictoc) to determine how long computation takes
 current_time = t_Sc[-1]
 new_time = current_time + first_time_step_size
 dt_Sc = first_time_step_size
+Tinf_old = Tinf0
+Tinf_new = Tinf0
 inc = 0
 num_runtime_updates = 0
 
@@ -598,7 +652,7 @@ while current_time < max_time:
     T_Sc=np.vstack([T_Sc,delta_Sc.T]) #Stack transpose of delta array (now horizontal) to T(t) solution matrix
     t_Sc = np.append(t_Sc, new_time) #Append time values to the end of an array
 
-    dt_Sc = NextTimeStep(G, t_Sc, dx_Sc, T_Sc, dt_Sc)
+    dt_Sc = NextTimeStep(CFL, G, t_Sc, dx_Sc, T_Sc, dt_Sc)
     current_time = t_Sc[-1]
     new_time = current_time + dt_Sc
     inc+=1
