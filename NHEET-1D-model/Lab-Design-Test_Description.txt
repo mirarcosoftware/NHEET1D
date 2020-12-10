@@ -2,13 +2,13 @@ Case Description for Lab-Design-Test:
 Inlet Temperature Specified by User-Defined Function 
 Crank Nicholson (i.e. Trapezoidal Rule) 2nd Order Time Integration 
 Column Diameter or Side Length: 0.457 m 
-Column Height: 0.457 m 
-Particle Diameter: 0.007 m 
+Column Height: 2.286 m 
+Particle Diameter: 0.010 m 
 Void Fraction: 0.200 
-Flow rate: 0.0076 m^3/s or 16.0 cfm 
-Superficial Velocity: 0.046 m/s 
-Reynolds Number (Ave): 21.4 
-CFL Number: 250.00 
-Average Time Step Size: 12.43 s 
+Flow rate: 0.1416 m^3/s or 300.0 cfm 
+Superficial Velocity: 0.862 m/s 
+Reynolds Number (Ave): 536.0 
+CFL Number: 2500.00 
+Average Time Step Size: 33.13 s 
 Maximum Solution Time: 2.00 hr 
-Ergun EQ Pressure Loss: 107.4 Pa 
+Ergun EQ Pressure Loss: 41128.6 Pa 

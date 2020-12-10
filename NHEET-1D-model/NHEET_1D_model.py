@@ -151,7 +151,7 @@ def ErgunEQ_PressureLoss():
     G_mean = rhof_mean*V_in
     
     delta_p = L*(150.*muf_mean/Dp**2*(1-eps)**2/eps**3*V_in + 1.75*rhof_mean/Dp*(1-eps)/eps**3*V_in**2)
-    print(delta_p)
+
     return delta_p
 
 def Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
@@ -362,6 +362,24 @@ def post_process():
         for j in range(0, len(T_Sc)):
             T_Post[j,i] = T_Sc[j,cell_ID[i]] - 273.15
 
+    #Heating/Cooling Rate 
+    #Rock Mass
+    dTsdt_Post = np.array([[0.]*N]*len(t_Sc))
+    for i in range(0,(len(t_Sc)-1)):
+        for j in range(0,N):
+            dTsdt_Post[i+1,j] = (T_Sc[i+1,j+N]-T_Sc[i,j+N])/(t_Sc[i+1]-t_Sc[i])
+    dTsdt_Post[-1,:] = dTsdt_Post[-2,:]
+    dTsdt_Post[0,:] = dTsdt_Post[1,:]
+    dQdt_Post = np.sum(dTsdt_Post, axis=1)*area*dx_Sc*(1-eps)*rhos*cps
+    #Air Enthalpy Change (Equivalent Expression)
+    #dQdt_Post2 = np.array([0.]*len(t_Sc))
+    #for i in range(0,(len(t_Sc)-1)):
+    #    Tfave_Post2 = 0.5*(T_Sc[i,N-1] + T_Sc[i,0])
+    #    cpave_Post2 = specheat(Tfave_Post2, p_frc[1], rxC)*1000./MW[1]
+    #    dmdt_Post2 = Q_in*(p_Sc[0]/Rgas[1]/T_Sc[i,0])
+    #    dQdt_Post2[i] = dmdt_Post2*cpave_Post2*(T_Sc[i,N-1]-T_Sc[i,0])
+    #dQdt_Post2[-1] = dQdt_Post2[-2] 
+    
     #For plotting
     #Available lines: 'solid', 'dashed', 'dashdot', 'dotted'
     plot_lines = ['solid','solid','solid','solid','solid','dashdot','dashdot','dashdot','dashdot','dashdot'] 
@@ -371,7 +389,7 @@ def post_process():
     #plot_markers = []
     Case_Description_Output()
     writeCSV(T_Post, time_hours)
-    plot(x_Post, T_Post, time_hours, plot_lines, plot_colors)
+    plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post)
 
 def Case_Description_Output():
     file = open(fileName+'_Description.txt', 'w')
@@ -424,14 +442,22 @@ def writeCSV(T_Post, time_hours):
     print('CSV Files Complete')
     return
 
-def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
+def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
     ## plotting
     print('Plotting...')
     
-    plot_title=fileName+'\nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f days, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
+    #rootdir = r'C:\Users\pgareau\Source\repos\NHEET-1D-model\NHEET-1D-model\Figures'
+    workingDir = os.getcwd()
+    if os.name == 'nt':
+        dirName = workingDir + r'\Solutions\Figures'
+    else:
+        dirName = workingDir + r'/Solutions/Figures'
+    # fileName = 'test.png'
+
+    plot_title=fileName+'\nTemperature at Various Column Depths \nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f hours, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
     # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
-    xlabel= 'time, hours' 
-    ylabel1= 'T, C'
+    xlabel= 't [hr]' 
+    ylabel1= 'T [C]'
 
     fig, ax1 = plt.subplots()
     ax1title=(plot_title)
@@ -456,7 +482,31 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors):
     else:
         dirName = workingDir + r'/Solutions/Figures'
     # fileName = 'test.png'
-    plt.savefig(dirName+'/'+fileName,bbox_inches = 'tight') #dpi=100
+    plt.savefig(dirName+'/'+fileName+'_T',bbox_inches = 'tight') #dpi=100
+
+    ####Second Plot - Heating and Cooling rate####
+    plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f hours, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
+    # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+    xlabel= 't [hr]' 
+    ylabel1= 'dQ/dt [W]'
+
+    fig, ax1 = plt.subplots()
+    ax1title=(plot_title)
+    plt.title(ax1title)
+
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel(ylabel1) 
+    ax1.tick_params(axis='y') 
+
+    ax1.plot(time_hours,dQdt_Post,color=plot_colors[0],linestyle=plot_lines[0],label='dQ/dt_Solids') 
+    #ax1.plot(time_hours,dQdt_Post2,color=plot_colors[0],linestyle=plot_lines[0],label='dQ/dt_Solids') 
+
+    ax1.xaxis.set_ticks_position('both')
+    ax1.legend(loc='center left', bbox_to_anchor=(1., 0.5))
+
+    plt.grid(True)
+
+    plt.savefig(dirName+'/'+fileName+'_dQdt',bbox_inches = 'tight') #dpi=100
 
     print('Plots Complete')
     print('Post Processing Complete')
@@ -492,15 +542,15 @@ ps = np.arcsin((T0-b)/a) #[rad]
 weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 16. #cfm Qcfm_in = 2850 #cfm
+Qcfm_in = 300. #cfm Qcfm_in = 2850 #cfm
 
 #### Geometry ###
 #Rock Mass
 D = 0.4572 #m
-L = D*1.0 #m
+L = D*5.0 #m
 area = np.pi/4.0*D**2 #m^2
 #Particle Diameter
-Dp = 0.0075
+Dp = 0.01
 #
 ### Geometry ### #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
 ##Rock Mass
@@ -533,7 +583,7 @@ if T_inlet_method == 2:
     table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
     max_time = Final_hour*3600.0 / 40.*1 #seconds
 ### Courant Friedrichs Lewy Number
-CFL = 250.
+CFL = 2500.
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
