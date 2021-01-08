@@ -1,0 +1,14 @@
+Case Description for Mine_Heating-Cooling_Potential:
+Inlet Temperature Specified by User-Defined Function 
+Crank Nicholson (i.e. Trapezoidal Rule) 2nd Order Time Integration 
+Column Diameter or Side Length: 0.407 m 
+Column Height: 0.407 m 
+Particle Diameter: 0.040 m 
+Void Fraction: 0.400 
+Flow rate: 0.1180 m^3/s or 250.0 cfm 
+Superficial Velocity: 0.907 m/s 
+Reynolds Number (Ave): 2254.7 
+CFL Number: 16000.00 
+Average Time Step Size: 35.90 s 
+Maximum Solution Time: 4.00 hr 
+Ergun EQ Pressure Loss: 173.9 Pa 

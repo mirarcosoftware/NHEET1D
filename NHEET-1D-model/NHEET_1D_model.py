@@ -21,7 +21,7 @@ print('Libraries loaded')
 from tictoc import tic, toc
 
 #A fluid properties solver intended for combustion applications is used here to obtain relationships for SI properties of dry air as a function of temperature.
-#Inputs below are selected so that properties of solely dry air are provided.
+#Inputs below are selected so that properties of dry air are provided.
 from fluid_properties12 import chem_rxn,MolWt,specheat,specheatk, \
     enthalpy, enthalpy_Tnew, enthalpy_T, entropy,viscosity,conductivity
 
@@ -72,11 +72,11 @@ def getC_Scf(G, Dp, muf, kf, eps):
     
     #Heat Transfer Correlations
     Rep = G*Dp/muf
-    #Verify which hp
+    ##Verify which hp
     Nup = ((1.18*Rep**0.58)**4 + (0.23*(Rep/(1 - eps))**0.75 )**4)**0.25
     hp = Nup*kf/Dp
     #hp = 17.773    #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-    #hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) 
+    ##hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) 
     Ap = 6*(1-eps)/(Dp)
     C_Scf = hp*Ap 
 
@@ -333,19 +333,28 @@ def runtime_Update(current_time, max_time, num_runtime_updates):
 def post_process():
     
     time_hours = t_Sc/3600.
+    time_years = t_Sc/(3600.*24.*365.)
+
+    if time_increments_post_processing_figures == 1:
+        time_Post = time_hours
+    elif time_increments_post_processing_figures == 2:
+        time_Post = time_years
+    else:
+        print('Invalid selection for time increments in post processing')
+
     #Cell Index at X-locations of 0*L, 0.25*L, 0.5*L, 0.75*L, and 1*L 
     #Fluid
     cell_f0 = 0
     cell_f1 = int(np.ceil(N/4))
     cell_f2 = int(np.ceil(N/2))
     cell_f3 = int(np.ceil(3*N/4))
-    cell_f4 = N-1
+    cell_f4 = N-1 #int(np.ceil(47*N/48))
     #Solid
     cell_s0 = 0 + N
     cell_s1 = int(np.ceil(N/4)) + N
     cell_s2 = int(np.ceil(N/2)) + N
     cell_s3 = int(np.ceil(3*N/4)) + N
-    cell_s4 = 2*N - 1
+    cell_s4 = 2*N - 1 #int(np.ceil(47*N/48)) + N
 
     cell_ID = np.array([cell_f0, cell_f1, cell_f2, cell_f3, cell_f4, cell_s0, cell_s1, cell_s2, cell_s3, cell_s4])
     cell_phase = ['fluid', 'fluid', 'fluid', 'fluid', 'fluid', 'solid', 'solid', 'solid', 'solid', 'solid']
@@ -389,7 +398,7 @@ def post_process():
     #plot_markers = []
     Case_Description_Output()
     writeCSV(T_Post, time_hours)
-    plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post)
+    plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post)
 
 def Case_Description_Output():
     file = open(fileName+'_Description.txt', 'w')
@@ -405,7 +414,10 @@ def Case_Description_Output():
     file.write('Column Diameter or Side Length: %.3f m \nColumn Height: %.3f m \nParticle Diameter: %.3f m \nVoid Fraction: %.3f \n' % (D, L, Dp, eps))
     file.write('Flow rate: %.4f m^3/s or %.1f cfm \nSuperficial Velocity: %.3f m/s \nReynolds Number (Ave): %.1f \n' % (Q_in, Qcfm_in, V_in, Re_mean))
     file.write('CFL Number: %.2f \nAverage Time Step Size: %.2f s \n' % (CFL, CFL*dx_Sc/V_in))
-    file.write('Maximum Solution Time: %.2f hr \n' % (max_time/3600.))
+    if time_increments_post_processing_figures == 1:
+        file.write('Maximum Solution Time: %.2f hr \n' % (max_time/3600.))
+    elif time_increments_post_processing_figures == 2:
+        file.write('Maximum Solution Time: %.2f yr\n' % (max_time/(3600.*24.*365.)))
     file.write('Ergun EQ Pressure Loss: %.1f Pa \n' % (delta_p))
     file.close()
   
@@ -442,7 +454,7 @@ def writeCSV(T_Post, time_hours):
     print('CSV Files Complete')
     return
 
-def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
+def plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post):
     ## plotting
     print('Plotting...')
     
@@ -454,11 +466,17 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
         dirName = workingDir + r'/Solutions/Figures'
     # fileName = 'test.png'
 
-    plot_title=fileName+'\nTemperature at Various Column Depths \nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f hours, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
-    # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
-    xlabel= 't [hr]' 
-    ylabel1= 'T [C]'
-
+    if time_increments_post_processing_figures == 1:
+        plot_title=fileName+'\nTemperature at Various Column Depths \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f hours, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [hr]' 
+        ylabel1= 'T [C]'
+    elif time_increments_post_processing_figures == 2:
+        plot_title=fileName+'\nTemperature at Various Column Depths \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [yr]' 
+        ylabel1= 'T [C]'
+    
     fig, ax1 = plt.subplots()
     ax1title=(plot_title)
     plt.title(ax1title)
@@ -468,7 +486,7 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
     ax1.tick_params(axis='y') 
 
     for i in range(0,len(x_Post)):
-        ax1.plot(time_hours,T_Post[:,i],color=plot_colors[i],linestyle=plot_lines[i],label='x=%.2f' % x_Post[i]) 
+        ax1.plot(time_Post,T_Post[:,i],color=plot_colors[i],linestyle=plot_lines[i],label='x = %.2f' % x_Post[i]) 
 
     ax1.xaxis.set_ticks_position('both')
     ax1.legend(loc='center left', bbox_to_anchor=(1., 0.5))
@@ -485,10 +503,16 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
     plt.savefig(dirName+'/'+fileName+'_T',bbox_inches = 'tight') #dpi=100
 
     ####Second Plot - Heating and Cooling rate####
-    plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm \nTotal time = %.1f hours, dt_final = %.5f' % (V_in, Qcfm_in,time_hours[-1], dt_Sc)
-    # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
-    xlabel= 't [hr]' 
-    ylabel1= 'dQ/dt [W]'
+    if time_increments_post_processing_figures == 1:
+        plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f hours, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [hr]' 
+        ylabel1= 'dQ/dt [W]'
+    elif time_increments_post_processing_figures == 2:
+        plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [yr]' 
+        ylabel1= 'T [C]'
 
     fig, ax1 = plt.subplots()
     ax1title=(plot_title)
@@ -498,8 +522,8 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
     ax1.set_ylabel(ylabel1) 
     ax1.tick_params(axis='y') 
 
-    ax1.plot(time_hours,dQdt_Post,color=plot_colors[0],linestyle=plot_lines[0],label='dQ/dt_Solids') 
-    #ax1.plot(time_hours,dQdt_Post2,color=plot_colors[0],linestyle=plot_lines[0],label='dQ/dt_Solids') 
+    ax1.plot(time_Post,dQdt_Post,color=plot_colors[0],linestyle=plot_lines[0],label='dQ/dt_Solids') 
+    #ax1.plot(time_Post,dQdt_Post2,color=plot_colors[0],linestyle=plot_lines[0],label='dQ/dt_Solids') 
 
     ax1.xaxis.set_ticks_position('both')
     ax1.legend(loc='center left', bbox_to_anchor=(1., 0.5))
@@ -510,7 +534,75 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
 
     print('Plots Complete')
     print('Post Processing Complete')
-    print('END')
+    
+    plt.show()
+    plt.close(fig)
+    return
+
+def Mine_HC_Potential():
+    #Inputs
+    T_Mine = 273.15 + 40.
+
+    T_ambient = T_Sc[:,0]
+    T_NHEET_Outlet = T_Sc[:,N-1]
+    cp_ambient = np.array([0.0]*len(T_Sc))
+    cp_NHEET_Outlet = np.array([0.0]*len(T_Sc))
+    HC_potential_NHEET = np.array([0.0]*len(T_Sc)) 
+    HC_potential_ambient = np.array([0.0]*len(T_Sc)) 
+    for x in range(0,len(T_Sc)):
+        cp_ambient[x] = specheat(T_ambient[x], p_frc[1], rxC)*1000./MW[1]
+        cp_NHEET_Outlet[x] = specheat(T_NHEET_Outlet[x], p_frc[1], rxC)*1000./MW[1]
+        HC_potential_ambient[x] = Q_in*p_Sc[0]/Rgas[1]/T_ambient[x]*cp_ambient[x]*(T_ambient[x] - T_Mine) #dm/dt*cp*deltaT
+        HC_potential_NHEET[x] = Q_in*p_Sc[0]/Rgas[1]/T_NHEET_Outlet[x]*cp_NHEET_Outlet[x]*(T_NHEET_Outlet[x] - T_Mine) #dm/dt*cp*deltaT
+
+    time_hours = t_Sc/3600.
+    time_years = t_Sc/(3600.*24.*365.)
+
+    if time_increments_post_processing_figures == 1:
+        time_Post = time_hours
+    elif time_increments_post_processing_figures == 2:
+        time_Post = time_years
+    else:
+        print('Invalid selection for time increments in post processing')
+
+    print('Plotting Mine Heating and Cooling Potential...')
+
+    if time_increments_post_processing_figures == 1:
+        plot_title=fileName+'\nMine Heating and Cooling Potential \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f hours, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [hr]' 
+        ylabel1= 'T [C]'
+    elif time_increments_post_processing_figures == 2:
+        plot_title=fileName+'\nMine Heating and Cooling Potential \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [yr]' 
+        ylabel1= 'T [C]'
+  
+    fig, ax1 = plt.subplots()
+    ax1title=(plot_title)
+    plt.title(ax1title)
+
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel(ylabel1) 
+    ax1.tick_params(axis='y') 
+
+    ax1.plot(time_Post,HC_potential_ambient,color='r',linestyle='solid',label='Ambient Air')
+    ax1.plot(time_Post,HC_potential_NHEET,color='b',linestyle='solid',label='NHEET')
+
+    ax1.xaxis.set_ticks_position('both')
+    ax1.legend(loc='center left', bbox_to_anchor=(1., 0.5))
+
+    plt.grid(True)
+
+    #rootdir = r'C:\Users\pgareau\Source\repos\NHEET-1D-model\NHEET-1D-model\Figures'
+    workingDir = os.getcwd()
+    if os.name == 'nt':
+        dirName = workingDir + r'\Solutions\Figures'
+    else:
+        dirName = workingDir + r'/Solutions/Figures'
+    # fileName = 'test.png'
+    plt.savefig(dirName+'/'+fileName+'_MHCP',bbox_inches = 'tight') #dpi=100
+
     plt.show()
     plt.close(fig)
     return
@@ -520,7 +612,7 @@ def plot(x_Post, T_Post, time_hours, plot_lines, plot_colors, dQdt_Post):
 ##########################
 
 ### Output File Name ###
-fileName = 'Lab-Design-Test'
+fileName = 'Mine_Heating-Cooling_Potential_Pilot-Scale2'
 
 ### Ambient Pressure ###
 pamb = 101325. #[Pa]
@@ -530,66 +622,78 @@ T0 = 283.15 #[K]
 
 ### Inlet Temperature ###
 #Choose Between Two Methods: 1 = User-Defined Function, 2 = Input CSV Table
-T_inlet_method = 1
+T_inlet_method = 2
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
 a = 30. #[K]
 b = 283.15 #[K]
-lamda = 3600.0*0.5 #[s]
+lamda = 3600.0*0.25 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
 ### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
 weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 300. #cfm Qcfm_in = 2850 #cfm
+Qcfm_in = 100000. #cfm
 
 #### Geometry ###
 #Rock Mass
-D = 0.4572 #m
-L = D*5.0 #m
-area = np.pi/4.0*D**2 #m^2
+D = 100. #m #ID of Sch80 18 in pipe is 0.407 m
+L = D*10. #m
+area = D**2 #np.pi/4.0*D**2 #m^2
 #Particle Diameter
-Dp = 0.01
-#
-### Geometry ### #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-##Rock Mass
-#D = 0.3048 #m
-#L= 1.2192 #m
-#area = D**2 #np.pi/4.0*D**2 #m^2
-##Particle Diameter
-#Dp = 0.028
-
-Vsuperficial = Qcfm_in/2118.88/area
-Re_mean = 1.125*Vsuperficial*Dp/1.81E-5 #m/s
-
+Dp = 0.04
 #Insulation Thickness # Not using for now
 #ithk = 0.1 #m
 #Porosity
-eps = 0.2
-#eps = 0.4537 #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
+eps = 0.25
 
 ### Spatial Discretization: N = # of points ###
 N = 200+1
 
 ### Transient Solution Parameters ###
 #Temporal Discretization 
-first_time_step_size = 10. #3600.*0.25
+first_time_step_size = 1. #3600.*0.25
 ### Maximum Time - Method 1 (Profile) ###
-max_time = 3600.*2. 
+max_time = 3600.*24.*365*3 
 ### Maximum Time - Method 2 (Input CSV Table) ###
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
-    max_time = Final_hour*3600.0 / 40.*1 #seconds
+    max_time = Final_hour*3600.0 / 40.*20 #seconds
 ### Courant Friedrichs Lewy Number
-CFL = 2500.
+CFL = 1000.
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
     # 1 = Backward Euler - First Order
     # 2 = Crank Nicholson (i.e. Trapezoidal Rule) - Second Order
-time_integrator = 2
+time_integrator = 1
+
+### Time units in post-processed figures ###
+## Choose Between Two Units: 
+    # 1 = Hours
+    # 2 = Years
+time_increments_post_processing_figures = 2
+
+### #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis - Here for now for quick overwrite of input variables
+#a = 44.25 #[K]
+#b = 274.9 #[K]
+#lamda = 3600.0*4. #[s]
+#ps = np.arcsin((T0-b)/a) #[rad]
+#
+### Geometry 
+#Rock Mass
+#D = 0.3048 #m
+#L= 1.2192 #m
+#area = D**2 #m^2
+##Particle Diameter
+#Dp = 0.028
+#eps = 0.4537
+###
+
+Vsuperficial = Qcfm_in/2118.88/area
+Re_mean = 1.125*Vsuperficial*Dp/1.81E-5 #m/s
 
 ##############################################
 #####     Setup and Initialization     #######
@@ -600,8 +704,8 @@ print('Setting Up and Initializing . . .')
 MW,Rgas,p_frc,z_st,p_mol,ptot,rxC = reaction_balance()
 
 #Flow rate calculations at Inlet
-Q_in = Qcfm_in/2118.88
-V_in = Q_in/area
+Q_in = Qcfm_in/2118.88 #m^3/s
+V_in = Q_in/area #m/s
 #Ergun EQ delta_p
 delta_p = ErgunEQ_PressureLoss()
 
@@ -717,5 +821,7 @@ toc() #End timekeeping
 
 print('Post Processing . . .')
 post_process()
+Mine_HC_Potential() #Mine heating and cooling potential
 
 ####### END #######
+print('END')
