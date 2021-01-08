@@ -15,6 +15,7 @@ import sys
 import csv
 import pandas as pd
 from termcolor import cprint
+from pathlib import Path
 #from scipy.interpolate import griddata
 print('Libraries loaded')
 #import time
@@ -76,7 +77,7 @@ def getC_Scf(G, Dp, muf, kf, eps):
     Nup = ((1.18*Rep**0.58)**4 + (0.23*(Rep/(1 - eps))**0.75 )**4)**0.25
     hp = Nup*kf/Dp
     #hp = 17.773    #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-    ##hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) 
+    ##hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) #alternative... find source
     Ap = 6*(1-eps)/(Dp)
     C_Scf = hp*Ap 
 
@@ -401,7 +402,14 @@ def post_process():
     plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post)
 
 def Case_Description_Output():
-    file = open(fileName+'_Description.txt', 'w')
+    
+    workingDir = os.getcwd()
+    if os.name == 'nt':
+        dirName = workingDir + r'\Solutions\Case_Description'
+    else:
+        dirName = workingDir + r'/Solutions/Case_Description'
+
+    file = open(dirName+'\\'+fileName+'_Description.txt', 'w')
     file.write('Case Description for ' + fileName + ':\n')
     if T_inlet_method == 1:
         file.write('Inlet Temperature Specified by User-Defined Function \n')
@@ -426,8 +434,15 @@ def Case_Description_Output():
 def writeCSV(T_Post, time_hours):
     print('Writing CSV Files...')
 
-    #dirName = r'C:\Users\pgareau\source\repos\NHEET-1D-model\NHEET-1D-model\Solutions\Data'
-    with open(fileName+'_CSV.csv', mode='w', newline='') as CSV_file:
+    workingDir = os.getcwd()
+    if os.name == 'nt':
+        dirName = workingDir + r'\Solutions\CSV'
+    else:
+        dirName = workingDir + r'/Solutions/CSV'
+    #path = Path(dirName)
+    #path.mkdir(parents=True)
+
+    with open(dirName+'\\'+fileName+'_CSV.csv', mode='w', newline='') as CSV_file:
         fieldnames = ['time_hours', 'Tf_0*L', 'Tf_0.25*L', 'Tf_0.50*L', 'Tf_0.75*L', 'Tf_1*L', 'Ts_0*L', 'Ts_0.25*L', 'Ts_0.50*L', 'Ts_0.75*L', 'Ts_1*L']
         write_file = csv.DictWriter(CSV_file, fieldnames=fieldnames)
         write_file.writeheader()
@@ -437,14 +452,15 @@ def writeCSV(T_Post, time_hours):
                                        'Ts_0.25*L': '%.2f' %T_Post[i,6], 'Ts_0.50*L': '%.2f' %T_Post[i,7], 'Ts_0.75*L': '%.2f' %T_Post[i,8], 
                                        'Ts_1*L': '%.2f' %T_Post[i,9]})
                
-    #For Full Data Set, Uncomment
+    ##For Full Data Set, Uncomment Below
+    #
     #Full_Data_Set = np.array([[0.]*(len(T_Sc[0]) + 1)]*len(t_Sc))
     #Full_Data_Set[:,0] = t_Sc[:] 
     #for i in range(0, len(t_Sc)):
     #    for j in range(0, len(T_Sc[0])):
     #        Full_Data_Set[i,j+1] = T_Sc[i,j]
 
-    #fullDataSet = open(fileName+'_FullDataSet.csv', mode='w', newline='')
+    #fullDataSet = open(dirName+'\\'+fileName+'_FullDataSet.csv', mode='w', newline='')
 
     #with fullDataSet:
 
@@ -458,7 +474,6 @@ def plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post):
     ## plotting
     print('Plotting...')
     
-    #rootdir = r'C:\Users\pgareau\Source\repos\NHEET-1D-model\NHEET-1D-model\Figures'
     workingDir = os.getcwd()
     if os.name == 'nt':
         dirName = workingDir + r'\Solutions\Figures'
@@ -594,13 +609,12 @@ def Mine_HC_Potential():
 
     plt.grid(True)
 
-    #rootdir = r'C:\Users\pgareau\Source\repos\NHEET-1D-model\NHEET-1D-model\Figures'
     workingDir = os.getcwd()
     if os.name == 'nt':
         dirName = workingDir + r'\Solutions\Figures'
     else:
         dirName = workingDir + r'/Solutions/Figures'
-    # fileName = 'test.png'
+
     plt.savefig(dirName+'/'+fileName+'_MHCP',bbox_inches = 'tight') #dpi=100
 
     plt.show()
@@ -612,7 +626,7 @@ def Mine_HC_Potential():
 ##########################
 
 ### Output File Name ###
-fileName = 'Mine_Heating-Cooling_Potential_Pilot-Scale2'
+fileName = 'Mine_Heating-Cooling_Potential_Lab-Scale2'
 
 ### Ambient Pressure ###
 pamb = 101325. #[Pa]
@@ -622,7 +636,7 @@ T0 = 283.15 #[K]
 
 ### Inlet Temperature ###
 #Choose Between Two Methods: 1 = User-Defined Function, 2 = Input CSV Table
-T_inlet_method = 2
+T_inlet_method = 1
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
 a = 30. #[K]
@@ -634,13 +648,13 @@ ps = np.arcsin((T0-b)/a) #[rad]
 weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 100000. #cfm
+Qcfm_in = 100. #cfm
 
 #### Geometry ###
 #Rock Mass
-D = 100. #m #ID of Sch80 18 in pipe is 0.407 m
-L = D*10. #m
-area = D**2 #np.pi/4.0*D**2 #m^2
+D = 0.407 #m #ID of Sch80 18 in pipe is 0.407 m
+L = D*1. #m
+area = np.pi/4.0*D**2 #m^2
 #Particle Diameter
 Dp = 0.04
 #Insulation Thickness # Not using for now
@@ -655,14 +669,14 @@ N = 200+1
 #Temporal Discretization 
 first_time_step_size = 1. #3600.*0.25
 ### Maximum Time - Method 1 (Profile) ###
-max_time = 3600.*24.*365*3 
+max_time = 3600.*4.
 ### Maximum Time - Method 2 (Input CSV Table) ###
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
-    max_time = Final_hour*3600.0 / 40.*20 #seconds
+    max_time = Final_hour*3600.0 / 40.*1 #seconds
 ### Courant Friedrichs Lewy Number
-CFL = 1000.
+CFL = 10000.
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
