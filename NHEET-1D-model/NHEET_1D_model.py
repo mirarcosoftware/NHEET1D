@@ -527,7 +527,7 @@ def plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post):
         plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
         # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
         xlabel= 't [yr]' 
-        ylabel1= 'T [C]'
+        ylabel1= 'dQ/dt [W]'
 
     fig, ax1 = plt.subplots()
     ax1title=(plot_title)
@@ -586,12 +586,12 @@ def Mine_HC_Potential():
         plot_title=fileName+'\nMine Heating and Cooling Potential \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f hours, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
         # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
         xlabel= 't [hr]' 
-        ylabel1= 'T [C]'
+        ylabel1= 'dQ/dt [W]'
     elif time_increments_post_processing_figures == 2:
         plot_title=fileName+'\nMine Heating and Cooling Potential \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
         # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
         xlabel= 't [yr]' 
-        ylabel1= 'T [C]'
+        ylabel1= 'dQ/dt [W]'
   
     fig, ax1 = plt.subplots()
     ax1title=(plot_title)
@@ -626,7 +626,7 @@ def Mine_HC_Potential():
 ##########################
 
 ### Output File Name ###
-fileName = 'Mine_Heating-Cooling_Potential_Lab-Scale2'
+fileName = 'Mine_Heating-Cooling_Potential_Pilot-Scale1'
 
 ### Ambient Pressure ###
 pamb = 101325. #[Pa]
@@ -636,7 +636,7 @@ T0 = 283.15 #[K]
 
 ### Inlet Temperature ###
 #Choose Between Two Methods: 1 = User-Defined Function, 2 = Input CSV Table
-T_inlet_method = 1
+T_inlet_method = 2
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
 a = 30. #[K]
@@ -648,12 +648,12 @@ ps = np.arcsin((T0-b)/a) #[rad]
 weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 100. #cfm
+Qcfm_in = 300000.0 #cfm
 
 #### Geometry ###
 #Rock Mass
-D = 0.407 #m #ID of Sch80 18 in pipe is 0.407 m
-L = D*1. #m
+D = 100 #m #ID of Sch80 18 in pipe is 0.407 m
+L = D*0.2 #m
 area = np.pi/4.0*D**2 #m^2
 #Particle Diameter
 Dp = 0.04
@@ -676,7 +676,7 @@ if T_inlet_method == 2:
     table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
     max_time = Final_hour*3600.0 / 40.*1 #seconds
 ### Courant Friedrichs Lewy Number
-CFL = 10000.
+CFL = 1000.
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
@@ -688,7 +688,7 @@ time_integrator = 1
 ## Choose Between Two Units: 
     # 1 = Hours
     # 2 = Years
-time_increments_post_processing_figures = 2
+time_increments_post_processing_figures = 1
 
 ### #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis - Here for now for quick overwrite of input variables
 #a = 44.25 #[K]

@@ -1,0 +1,14 @@
+Case Description for Mine_Heating-Cooling_Potential_Pilot-Scale1:
+Inlet Temperature Specified by CSV Table Input 
+Backward Euler 1st Order Time Integration 
+Column Diameter or Side Length: 100.000 m 
+Column Height: 20.000 m 
+Particle Diameter: 0.040 m 
+Void Fraction: 0.250 
+Flow rate: 141.5842 m^3/s or 300000.0 cfm 
+Superficial Velocity: 0.018 m/s 
+Reynolds Number (Ave): 44.8 
+CFL Number: 1000.00 
+Average Time Step Size: 5547.21 s 
+Maximum Solution Time: 8759.95 hr 
+Ergun EQ Pressure Loss: 38.5 Pa 
