@@ -334,11 +334,14 @@ def runtime_Update(current_time, max_time, num_runtime_updates):
 def post_process():
     
     time_hours = t_Sc/3600.
+    time_days = t_Sc/(3600.*24.)
     time_years = t_Sc/(3600.*24.*365.)
 
     if time_increments_post_processing_figures == 1:
         time_Post = time_hours
     elif time_increments_post_processing_figures == 2:
+        time_Post = time_days
+    elif time_increments_post_processing_figures == 3:
         time_Post = time_years
     else:
         print('Invalid selection for time increments in post processing')
@@ -425,6 +428,8 @@ def Case_Description_Output():
     if time_increments_post_processing_figures == 1:
         file.write('Maximum Solution Time: %.2f hr \n' % (max_time/3600.))
     elif time_increments_post_processing_figures == 2:
+        file.write('Maximum Solution Time: %.2f days\n' % (max_time/(3600.*24.)))
+    elif time_increments_post_processing_figures == 3:
         file.write('Maximum Solution Time: %.2f yr\n' % (max_time/(3600.*24.*365.)))
     file.write('Ergun EQ Pressure Loss: %.1f Pa \n' % (delta_p))
     file.close()
@@ -487,6 +492,11 @@ def plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post):
         xlabel= 't [hr]' 
         ylabel1= 'T [C]'
     elif time_increments_post_processing_figures == 2:
+        plot_title=fileName+'\nTemperature at Various Column Depths \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f days, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [days]' 
+        ylabel1= 'T [C]'
+    elif time_increments_post_processing_figures == 3:
         plot_title=fileName+'\nTemperature at Various Column Depths \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
         # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
         xlabel= 't [yr]' 
@@ -524,6 +534,11 @@ def plot(x_Post, T_Post, time_Post, plot_lines, plot_colors, dQdt_Post):
         xlabel= 't [hr]' 
         ylabel1= 'dQ/dt [W]'
     elif time_increments_post_processing_figures == 2:
+        plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f days, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [days]' 
+        ylabel1= 'dQ/dt [W]'
+    elif time_increments_post_processing_figures == 3:
         plot_title=fileName+' \nRock Mass Heating and Cooling Rate \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
         # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
         xlabel= 't [yr]' 
@@ -571,11 +586,14 @@ def Mine_HC_Potential():
         HC_potential_NHEET[x] = Q_in*p_Sc[0]/Rgas[1]/T_NHEET_Outlet[x]*cp_NHEET_Outlet[x]*(T_NHEET_Outlet[x] - T_Mine) #dm/dt*cp*deltaT
 
     time_hours = t_Sc/3600.
+    time_years = t_Sc/(3600.*24.)
     time_years = t_Sc/(3600.*24.*365.)
 
     if time_increments_post_processing_figures == 1:
         time_Post = time_hours
     elif time_increments_post_processing_figures == 2:
+        time_Post = time_days
+    elif time_increments_post_processing_figures == 3:
         time_Post = time_years
     else:
         print('Invalid selection for time increments in post processing')
@@ -588,11 +606,16 @@ def Mine_HC_Potential():
         xlabel= 't [hr]' 
         ylabel1= 'dQ/dt [W]'
     elif time_increments_post_processing_figures == 2:
+        plot_title=fileName+'\nMine Heating and Cooling Potential \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f days, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
+        # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
+        xlabel= 't [days]' 
+        ylabel1= 'dQ/dt [W]'
+    elif time_increments_post_processing_figures == 3:
         plot_title=fileName+'\nMine Heating and Cooling Potential \nVs = %.3f m/s, Q = %.1f cfm, Rep = %.1f \nErgun EQ Pressure Loss = %.2f Pa or %.2f in. w.g. \nTotal time = %.1f years, dt_final = %.2f s' % (V_in, Qcfm_in, Re_mean, delta_p, delta_p*0.00401865, time_Post[-1], dt_Sc)
         # plot_title=fileName+'\nDimensions: L = %.2f m, D = %.2f m, Dp = %.3f m \nQ = %.1f cfm = %.5f m3/s \nCycle = %.2f hours, Total time = %.1f hours \ndt = %.1fs, dx = %.2fm' % (L,D,Dp,Qcfm_in,Q_in,lamda/3600.0,t_SP[-1]/3600, dt_SP, dx_SP)
         xlabel= 't [yr]' 
         ylabel1= 'dQ/dt [W]'
-  
+
     fig, ax1 = plt.subplots()
     ax1title=(plot_title)
     plt.title(ax1title)
@@ -626,13 +649,13 @@ def Mine_HC_Potential():
 ##########################
 
 ### Output File Name ###
-fileName = 'Mine_Heating-Cooling_Potential_Pilot-Scale1'
+fileName = 'Experiment2-Design_8in-Fan_14ft_x_14ft_x_6ft-1cm_rocks'
 
 ### Ambient Pressure ###
 pamb = 101325. #[Pa]
 
 ### Initial Rock Temperature ###
-T0 = 283.15 #[K]
+T0 = 293.15 #[K]
 
 ### Inlet Temperature ###
 #Choose Between Two Methods: 1 = User-Defined Function, 2 = Input CSV Table
@@ -645,25 +668,25 @@ lamda = 3600.0*0.25 #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
 ### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
-weather_df = np.genfromtxt('Input_Hourly_Weather_Data_2010-2019.csv', delimiter=",", dtype = float, skip_header = 1)
+weather_df = np.genfromtxt('Input_Hourly_Weather_Data_July2019.csv', delimiter=",", dtype = float, skip_header = 1)
 
 ### Volumetric Flow Rate (constant) ###
-Qcfm_in = 300000.0 #cfm
+Qcfm_in = 525.0 #cfm
 
 #### Geometry ###
 #Rock Mass
-D = 100 #m #ID of Sch80 18 in pipe is 0.407 m
-L = D*0.2 #m
-area = np.pi/4.0*D**2 #m^2
+D = 14.*0.3048 #m #ID of Sch80 18 in pipe is 0.407 m
+L = 6.*0.3048 #m
+area = D**2 #np.pi/4.0*D**2 #m^2
 #Particle Diameter
-Dp = 0.04
+Dp = 0.01
 #Insulation Thickness # Not using for now
 #ithk = 0.1 #m
 #Porosity
-eps = 0.25
+eps = 0.3
 
 ### Spatial Discretization: N = # of points ###
-N = 200+1
+N = 150+1
 
 ### Transient Solution Parameters ###
 #Temporal Discretization 
@@ -674,9 +697,9 @@ max_time = 3600.*4.
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
-    max_time = Final_hour*3600.0 / 40.*1 #seconds
+    max_time = Final_hour*3600.0 *15./31. #seconds
 ### Courant Friedrichs Lewy Number
-CFL = 1000.
+CFL = 800.
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
@@ -687,8 +710,9 @@ time_integrator = 1
 ### Time units in post-processed figures ###
 ## Choose Between Two Units: 
     # 1 = Hours
-    # 2 = Years
-time_increments_post_processing_figures = 1
+    # 2 = Days
+    # 3 = Years
+time_increments_post_processing_figures = 2
 
 ### #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis - Here for now for quick overwrite of input variables
 #a = 44.25 #[K]
@@ -835,7 +859,7 @@ toc() #End timekeeping
 
 print('Post Processing . . .')
 post_process()
-Mine_HC_Potential() #Mine heating and cooling potential
+#Mine_HC_Potential() #Mine heating and cooling potential
 
 ####### END #######
 print('END')
