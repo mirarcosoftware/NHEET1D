@@ -1,0 +1,16 @@
+Case Description for Exp2-Fluent-Comparison-Enhanced-Schumann-Test2:
+Inlet Temperature Specified by CSV Table Input 
+Backward Euler 1st Order Time Integration 
+Column Diameter or Side Length: 4.267 m 
+Column Height: 2.438 m 
+Particle Diameter: 0.020 m 
+Void Fraction: 0.300 
+Flow rate: 0.2478 m^3/s or 525.0 cfm 
+Superficial Velocity: 0.014 m/s 
+Reynolds Number (Ave): 16.9 
+Heat Transfer Coefficient and Effective HTC (Ave): 7.46 W/(m^2K) and 7.42 W/(m^2K)
+Biot Number (Ave): 0.06 
+CFL Number: 100.00 
+Average Time Step Size: 119.47 s 
+Maximum Solution Time: 9.99 days
+Ergun EQ Pressure Loss: 5.3 Pa 

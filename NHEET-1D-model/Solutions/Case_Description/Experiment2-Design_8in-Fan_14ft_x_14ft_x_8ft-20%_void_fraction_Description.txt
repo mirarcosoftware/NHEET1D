@@ -1,0 +1,14 @@
+Case Description for Experiment2-Design_8in-Fan_14ft_x_14ft_x_8ft-20%_void_fraction:
+Inlet Temperature Specified by CSV Table Input 
+Backward Euler 1st Order Time Integration 
+Column Diameter or Side Length: 4.267 m 
+Column Height: 2.438 m 
+Particle Diameter: 0.020 m 
+Void Fraction: 0.200 
+Flow rate: 0.2478 m^3/s or 525.0 cfm 
+Superficial Velocity: 0.014 m/s 
+Reynolds Number (Ave): 16.9 
+CFL Number: 800.00 
+Average Time Step Size: 955.73 s 
+Maximum Solution Time: 14.98 days
+Ergun EQ Pressure Loss: 22.8 Pa 

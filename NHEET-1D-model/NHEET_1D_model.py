@@ -77,7 +77,7 @@ def getC_Scf(G, Dp, muf, kf, eps):
     Nup = ((1.18*Rep**0.58)**4 + (0.23*(Rep/(1 - eps))**0.75 )**4)**0.25
     hp = Nup*kf/Dp
     #hp = 17.773    #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-    ##hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) #alternative... find source
+    #hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) #Effective heat transfer coefficient accounting for Biot Number Effects
     Ap = 6*(1-eps)/(Dp)
     C_Scf = hp*Ap 
 
@@ -303,12 +303,94 @@ def Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
 
     return AA_Sc, RHS_Sc, G
 
+def Enhanced_Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc):
+
+    #Note: Twice the size for each matrix and array due to coupling of Ts and Tf (Fluid and Solid combined)
+    AA_Sc = np.array([[0.]*2*N]*2*N)
+    RHS_Sc =np.array([[0.]*1]*2*N)
+
+    #Fluid BC at LE - Temperature is fixed to inlet fluid temperature - Solid temperature is not fixed
+    AA_Sc[0,0]=1.
+
+    #Matrix Inputs
+    #Fluid
+    # D_Scf = np.array([0.0]*N) #Ts, Tf
+    ##Solid
+    A_Scs = getA_Scs(rhos,cps)#dTs/dt #Constant 
+    #C_Scs = ks  #Enhanced Schumann #Constant
+    C_Scs = ks*(1 - eps) #In line with Fluent
+    #Update Fluid BC at Left End
+    RHS_Sc[0,0]=Tinf_new
+
+    rhof_Sc = pamb/Rgas[1]/Tinf_old #kg/m^3
+    cpf_Sc = specheat(Tinf_old, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+    muf_Sc = viscosity(Tinf_old, p_frc[1], rxC) #kg/m-s
+    kf_Sc = conductivity(Tinf_old, p_frc[1], rxC) #W/m-K   
+    G = rhof_Sc*V_in
+        
+    C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
+    B_Scs = getB_Scs(C_Scf)
+    
+    #Solid at LE - Fluid Properties are Constant
+    AA_Sc[N,N] = A_Scs/dt_Sc + B_Scs
+    AA_Sc[N,0] = -B_Scs
+    RHS_Sc[N] = delta_Sc[N]*(A_Scs/dt_Sc)
+
+    for j in range(1,N): #Begin for loop
+        
+        #Fluid Properties Note: A function of T only (i.e. incompressible ideal gas assumed)
+        T_cell_Scf=T_Sc[inc][j] 
+        rhof_Sc=p_Sc[j]/Rgas[1]/T_cell_Scf #kg/m^3
+        cpf_Sc=specheat(T_cell_Scf, p_frc[1], rxC)*1000./MW[1] #J/kg-K
+        muf_Sc=viscosity(T_cell_Scf, p_frc[1], rxC) #kg/m-s
+        kf_Sc=conductivity(T_cell_Scf, p_frc[1], rxC) #W/m-K   
+        
+        #Get variables Avar_Scf,Bvar_Scf,Cvar_Scf
+        A_Scf = getA_Scf(rhof_Sc,cpf_Sc)
+        B_Scf = getB_Scf(G, cpf_Sc)
+        C_Scf = getC_Scf(G, Dp, muf_Sc, kf_Sc, eps)
+        #E_Scf = kf_Sc #Enhanced Schumann
+        E_Scf = kf_Sc*eps #In line with Fluent
+        B_Scs = getB_Scs(C_Scf)
+        
+        #Matrix Coefficients and RHS
+        if j < N-1: 
+            #Second Order Accurate Central Differencing Scheme
+            #Fluid  
+            AA_Sc[j,j-1] = -B_Scf/(2.*dx_Sc) -E_Scf/dx_Sc**2.
+            AA_Sc[j,j] = A_Scf/dt_Sc + C_Scf + 2.*E_Scf/dx_Sc**2.
+            AA_Sc[j,j+1] = B_Scf/(2.*dx_Sc) - E_Scf/dx_Sc**2.
+            AA_Sc[j,j+N] = -C_Scf
+            RHS_Sc[j] = delta_Sc[j]*(A_Scf/dt_Sc)
+            #Solid
+            AA_Sc[j+N,j+N-1] = -C_Scs/dx_Sc**2.
+            AA_Sc[j+N,j+N] = A_Scs/dt_Sc + B_Scs +2.*C_Scs/dx_Sc**2.
+            AA_Sc[j+N,j+N+1] = -C_Scs/dx_Sc**2.
+            AA_Sc[j+N,j] = -B_Scs
+            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs/dt_Sc)
+        else:
+            #First Order Accurate Backward Differencing Scheme for Cells at Right End
+            #Fluid 
+            AA_Sc[j,j-2] = -E_Scf/dx_Sc**2.
+            AA_Sc[j,j-1] = -B_Scf/dx_Sc + 2.*E_Scf/dx_Sc**2.
+            AA_Sc[j,j] = A_Scf/dt_Sc + B_Scf/dx_Sc + C_Scf - E_Scf/dx_Sc**2.
+            AA_Sc[j,j+N] = -C_Scf
+            RHS_Sc[j] = delta_Sc[j]*(A_Scf/dt_Sc)
+            #Solid
+            AA_Sc[j+N,j+N-2] = -C_Scs/dx_Sc**2
+            AA_Sc[j+N,j+N-1] = 2.*C_Scs/dx_Sc**2
+            AA_Sc[j+N,j+N] = A_Scs/dt_Sc + B_Scs - C_Scs/dx_Sc**2
+            AA_Sc[j+N,j] = -B_Scs
+            RHS_Sc[j+N] = delta_Sc[j+N]*(A_Scs/dt_Sc) #End for loop
+
+    return AA_Sc, RHS_Sc, G
+
 def NextTimeStep(CFL, G, t_Sc, dx_Sc, T_Sc, dt_old):
     
     T_max = np.amax(T_Sc[len(t_Sc)-1])
     rhof_min = pamb/Rgas[1]/T_max #kg/m^3
     Vsuperficial_max = G/rhof_min
-    
+    dt_new = dt_old
     dt_new = CFL*dx_Sc/Vsuperficial_max
     if dt_new/dt_old > 1.2:
         dt_new = 1.2*dt_old
@@ -424,6 +506,7 @@ def Case_Description_Output():
         file.write('Crank Nicholson (i.e. Trapezoidal Rule) 2nd Order Time Integration \n')
     file.write('Column Diameter or Side Length: %.3f m \nColumn Height: %.3f m \nParticle Diameter: %.3f m \nVoid Fraction: %.3f \n' % (D, L, Dp, eps))
     file.write('Flow rate: %.4f m^3/s or %.1f cfm \nSuperficial Velocity: %.3f m/s \nReynolds Number (Ave): %.1f \n' % (Q_in, Qcfm_in, V_in, Re_mean))
+    file.write('Heat Transfer Coefficient and Effective HTC (Ave): %.2f W/(m^2K) and %.2f W/(m^2K)\nBiot Number (Ave): %.2f \n' % (hp_mean, hp_effective_mean, Bi_mean))
     file.write('CFL Number: %.2f \nAverage Time Step Size: %.2f s \n' % (CFL, CFL*dx_Sc/V_in))
     if time_increments_post_processing_figures == 1:
         file.write('Maximum Solution Time: %.2f hr \n' % (max_time/3600.))
@@ -649,7 +732,7 @@ def Mine_HC_Potential():
 ##########################
 
 ### Output File Name ###
-fileName = 'Experiment2-Design_8in-Fan_14ft_x_14ft_x_6ft-1cm_rocks'
+fileName = 'Exp2-Fluent-Comparison-Enhanced-Schumann-Test3'
 
 ### Ambient Pressure ###
 pamb = 101325. #[Pa]
@@ -662,9 +745,9 @@ T0 = 293.15 #[K]
 T_inlet_method = 2
 ### Method 1 (Profile) ###
 #Constants: a = amplitude, b= average value, ps= phase shift, lamda = wavelength (cycle duration) #time is in seconds
-a = 30. #[K]
-b = 283.15 #[K]
-lamda = 3600.0*0.25 #[s]
+a = 10. #[K]
+b = 293.15 #[K]
+lamda = 3600.0*24. #[s]
 ps = np.arcsin((T0-b)/a) #[rad]
 ### Method 2 (Input CSV Table) ###
 #Temperature from table - #input Table must have a header, and its first and second column must be time [hr] and Temperature [C]
@@ -676,30 +759,41 @@ Qcfm_in = 525.0 #cfm
 #### Geometry ###
 #Rock Mass
 D = 14.*0.3048 #m #ID of Sch80 18 in pipe is 0.407 m
-L = 6.*0.3048 #m
+L = 8.*0.3048 #m
 area = D**2 #np.pi/4.0*D**2 #m^2
 #Particle Diameter
-Dp = 0.01
+Dp = 0.02
 #Insulation Thickness # Not using for now
 #ithk = 0.1 #m
 #Porosity
 eps = 0.3
+
+#Solid Material Properties
+### Granite
+rhos = 2635. #kg/m^3 #check 2418.788
+cps = 790. #J/kg-K
+ks = 2.6 #W/m-K
 
 ### Spatial Discretization: N = # of points ###
 N = 150+1
 
 ### Transient Solution Parameters ###
 #Temporal Discretization 
-first_time_step_size = 1. #3600.*0.25
+first_time_step_size = 120. #3600.*0.25
 ### Maximum Time - Method 1 (Profile) ###
-max_time = 3600.*4.
+max_time = 3600.*24.*15.
 ### Maximum Time - Method 2 (Input CSV Table) ###
 if T_inlet_method == 2:
     Final_hour = weather_df[-2,0] #last data point is clipped to ensure interpolation does not fail
     table_intervals = weather_df[1,0] - weather_df[0,0] #intervals must be evenly spaced
-    max_time = Final_hour*3600.0 *15./31. #seconds
+    max_time = Final_hour*3600.0 *10./31. #seconds
 ### Courant Friedrichs Lewy Number
-CFL = 800.
+CFL = 100.
+
+### Include Thermal Conductivity (i.e. Enhanced Schumann) ###
+    # 0 = Do not include (Schumann Model)
+    # 1 = Include (Enhanced Schumann Model) - Cannot use Crank Nicholson Time Integrator right now. Note: Enhanced Schumann conductivity is not the same as Fluent conductivity, which includes void fraction.
+Enhanced_Schumann = 1
 
 ### Time Integrator ###
 ## Choose Between Two Methods: 
@@ -728,10 +822,19 @@ time_increments_post_processing_figures = 2
 ##Particle Diameter
 #Dp = 0.028
 #eps = 0.4537
+#
+### Solid Material Properties
+#rhos = 2418.79 #kg/m^3
+#cps = 908.54 #J/kg-K
+#ks = 1.2626 #W/m-K
 ###
 
 Vsuperficial = Qcfm_in/2118.88/area
 Re_mean = 1.125*Vsuperficial*Dp/1.81E-5 #m/s
+Nup_mean = ((1.18*Re_mean**0.58)**4 + (0.23*(Re_mean/(1 - eps))**0.75 )**4)**0.25
+hp_mean = Nup_mean*0.02436/Dp
+hp_effective_mean = 1/(Dp/(Nup_mean*0.02436) + Dp/(10*ks)) #Effective heat transfer coefficient accounting for Biot Number Effects
+Bi_mean = hp_mean*Dp/ks
 
 ##############################################
 #####     Setup and Initialization     #######
@@ -757,16 +860,6 @@ cpf_in=specheat(Tinf0, p_frc[1], rxC)*1000./MW[1] #J/kg-K
 muf_in=viscosity(Tinf0, p_frc[1], rxC) #kg/m-s
 kf_in=conductivity(Tinf0, p_frc[1], rxC) #W/m-K
 G_0=rhof_in*V_in
-
-#Solid Properties (Constant)
-### Granite
-rhos = 2635. #kg/m^3
-cps = 790. #J/kg-K
-ks = 2.6 #W/m-K
-### Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
-#rhos = 2418.79 #kg/m^3
-#cps = 908.54 #J/kg-K
-#ks = 1.2626 #W/m-K
 
 #Particle Reynolds and Prandtl at Inlet
 Rep_in = G_0*Dp/muf_in
@@ -804,6 +897,7 @@ else:
     print('Error - Invalid Time Integration Method Selection')
 print('Column Diameter or Side Length: %.3f m \nColumn Height: %.3f m \nParticle Diameter: %.3f m \nVoid Fraction: %.3f' % (D, L, Dp, eps))
 print('Flow rate: %.4f m^3/s or %.1f cfm \nSuperficial Velocity: %.3f m/s \nReynolds Number (Ave): %.1f' % (Q_in, Qcfm_in, V_in, Re_mean))
+print('Heat Transfer Coefficient and Effective HTC (Ave): %.2f W/(m^2K) and %.2f W/(m^2K)\nBiot Number (Ave): %.2f ' % (hp_mean, hp_effective_mean, Bi_mean))
 print('CFL Number: %.2f \nAverage Time Step Size: %.2f s' % (CFL, CFL*dx_Sc/V_in))
 print('Maximum Solution Time: %.2f hr' % (max_time/3600.))
 print('Ergun EQ Pressure Loss: %.1f Pa or %.3f in. w.g.\n' % (delta_p, delta_p/248.84))
@@ -830,14 +924,23 @@ while current_time < max_time:
     Tinf_new = T_inlet(new_time)
     
     ##### Get Matrix AA and Vector RHS #####
-    if time_integrator == 1:
-        AA_Sc,RHS_Sc, G = Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
-    elif time_integrator == 2:
-        AA_Sc,RHS_Sc, G = Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
+    if Enhanced_Schumann == 1:
+        if time_integrator == 1:
+            AA_Sc,RHS_Sc, G = Enhanced_Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
+        else:
+            print("Incorrect Time Integrator Selection")
+            break
+    elif Enhanced_Schumann == 0:
+        if time_integrator == 1:
+            AA_Sc,RHS_Sc, G = Schumman_Backward_Euler1(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
+        elif time_integrator == 2:
+            AA_Sc,RHS_Sc, G = Schumman_Crank_Nicholson(Tinf_old, Tinf_new, p_Sc, T_Sc, delta_Sc)
+        else:
+            print("Incorrect Time Integrator Selection")
+            break
     else:
-        print("Incorrect Time Integrator Selection")
+        print("Incorrect Model Selection")
         break
-
     ##### Solve temperature at updated time "new_time" #####
     delta_Sc=np.linalg.lstsq(AA_Sc,RHS_Sc,rcond=-1)[0] #Returns the least-squares solution to a linear matrix equation
 
