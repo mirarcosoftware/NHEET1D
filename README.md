@@ -2,5 +2,5 @@
 NHEET Project 1D model
 
 Developers:
-P. Gareau
+P. Gareau;
 D. Cerantola
