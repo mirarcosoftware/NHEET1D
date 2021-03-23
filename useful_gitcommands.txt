@@ -1,0 +1,15 @@
+To add/modify repository on github
+$ git add .
+$ git status
+$ git commit -m "<message about revision>"
+-login to validate
+
+To have repository on local PC
+git remote add origin https://github.com/<>
+git push -u origin master
+
+Notes:
+- if local directory linked to wrong repository: 
+$git remote set-url origin https://github.com/mirarcosoftware/NHEET1D.git
+-to check if up to date
+$git pull
