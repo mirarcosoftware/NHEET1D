@@ -3,6 +3,7 @@ $ git add .
 $ git status
 $ git commit -m "<message about revision>"
 -login to validate
+$git push
 
 To have repository on local PC
 git remote add origin https://github.com/<>
