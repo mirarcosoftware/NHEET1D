@@ -81,6 +81,7 @@ def getC_Scf(Rep,Pr, kf, eps,Nu_method):
     hp = Nup*kf/Dp
     #hp = 17.773    #Abdel-Ghaffar, E. A.-M., 1980. PhD Thesis
     #hp=1/(Dp/(Nup*kf) + Dp/(10*ks)) 
+    #hp=1/(Dp/(Nup*kf) + Dp/(10*3.))
     Ap = 6*(1-eps)/(Dp)
     C_Scf = hp*Ap 
     return C_Scf
@@ -902,11 +903,14 @@ def iterate(n,inlet_bc_type,const_input_vals,rxn_consts,Tprof_consts):
     elif inlet_bc_type==2:
         W0 = inlet_bc
         V_in = W0/(pamb/Rgas/Tinf0)/area
+        #V_in = W0/(pamb/Rgas/300.)/area
         Q_in = V_in*area
         inlet_bc_label='W0'
         
     if T_inlet_method == 1:
         T_mean = Tinf0
+        #T_mean = Tprof_consts[0]+Tprof_consts[1]
+        print(T_mean)
     elif T_inlet_method == 2:
         T_max = np.amax(weather_df[:,1]) + 273.15 #K
         T_min = np.amin(weather_df[:,1]) + 273.15 #K
@@ -1060,10 +1064,12 @@ def iterate(n,inlet_bc_type,const_input_vals,rxn_consts,Tprof_consts):
                 rhof[i] = pamb/Rgas/Tnew.T[0][i] #kg/m^3
                 cpf[i] = specheat(Tnew.T[0][i], p_frc, rxC)*1000./MW #J/kg-K
                 muf[i] = viscosity(Tnew.T[0][i], p_frc, rxC) #kg/m-s
-                kf[i] = conductivity(Tnew.T[0][i], p_frc, rxC) #W/m-K    #Unused
+                kf[i] = conductivity(Tnew.T[0][i], p_frc, rxC) #W/m-K    
                 Vtmp[i]=W0/area/rhof[i]
                 #delta_ps_tmp[i]=Koekemoer_PressureLoss(Dp,Dpcorr,phi,eps,L-x_Sc[i],Vtmp[0],rhof[0],muf[0]) 
-                delta_ps_tmp[i]=ErgunEQ_PressureLoss(Dp,Dpcorr,phi,eps,L,Vtmp[0],rhof[0],muf[0])-ErgunEQ_PressureLoss(Dp,Dpcorr,phi,eps,x_Sc[i],Vtmp[0],rhof[0],muf[0])
+                #delta_ps_tmp[i]=ErgunEQ_PressureLoss(Dp,Dpcorr,phi,eps,L,Vtmp[0],rhof[0],muf[0])-ErgunEQ_PressureLoss(Dp,Dpcorr,phi,eps,x_Sc[i],Vtmp[0],rhof[0],muf[0])
+            for i in range(0,N):
+                delta_ps_tmp[i]=ErgunEQ_PressureLoss(Dp,Dpcorr,phi,eps,L,Vtmp[-1],rhof[-1],muf[-1])-ErgunEQ_PressureLoss(Dp,Dpcorr,phi,eps,x_Sc[i],Vtmp[-1],rhof[-1],muf[-1])
             fluidprops=np.array([rhof,cpf,muf,kf])
 #       ### END PREDICTOR-CORRECTOR LOOP
             
@@ -1112,7 +1118,7 @@ def iterate(n,inlet_bc_type,const_input_vals,rxn_consts,Tprof_consts):
     post_process(n,dirItName)
     #Mine_HC_Potential(n,dirItName) #Mine heating and cooling potential
     geom_vals=[Dp,L,area,eps,W0,N]
-    Matrix = np.array([x_Sc,t_Sc,T_Sc,delta_ps,ps,Pt,xM,V])
+    Matrix = [x_Sc,t_Sc,T_Sc,delta_ps,ps,Pt,xM,V]
 
     return pamb,dirItName,x_Sc,T_Sc,t_Sc,Iminmax,tminmax,Tminmax,geom_vals,Matrix,current_time,delta_p,delta_p2
 

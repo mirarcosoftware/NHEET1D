@@ -14,3 +14,6 @@ Mar23,2021
 -NHEET_Tprofile_fns post-processes dataset for a temperature input function to provide inputs for a steady-state particle-resolved CFD analysis. Note that in cfd study, packed bed inlet is at y=L and outlet at y=0.
 -some global variables are also defined as local variables; this may cause issues.
 -see the individual files for a list of revisions.
+Mar30,2021
+-may need to add some additional functions (termcolor) with 'pip install <fn>' 
+-functions updated to cooperate with Anaconda3-2020.11-Windows-x86_64.exe
