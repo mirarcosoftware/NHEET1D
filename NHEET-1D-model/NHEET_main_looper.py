@@ -130,7 +130,7 @@ def NHEET_main(const_input_vals, var_inputs):
 
     responses = np.zeros([NNtot,len(response_labels)]) #initialize array
     rxn_consts=reaction_balance()
-
+    
     for n in range(0,NNtot): 
         Tprof_consts=nim.inputs_const(factors[n,0],factors[n,1],factors[n,1]*factors[n,2],const_input_vals,rxn_consts)
         nim.inputs_var(factors[n,:])
